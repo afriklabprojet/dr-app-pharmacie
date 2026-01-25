@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../../../../core/network/api_client.dart';
 import '../models/auth_response_model.dart';
 import '../models/user_model.dart';
@@ -37,6 +38,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     // Normaliser l'email en minuscules pour éviter les problèmes de case sensitivity
     final normalizedEmail = email.toLowerCase().trim();
     
+    debugPrint('🌐 [AuthRemoteDataSource] login() - email: $normalizedEmail');
+    debugPrint('🌐 [AuthRemoteDataSource] Envoi requête POST vers /auth/login...');
+    
     final response = await apiClient.post(
       '/auth/login', // Adjust endpoint if needed
       data: {
@@ -47,6 +51,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             'pharmacy', // Assuming backend filters or validates role if sent
       },
     );
+    
+    debugPrint('🌐 [AuthRemoteDataSource] Réponse reçue - status: ${response.statusCode}');
+    debugPrint('🌐 [AuthRemoteDataSource] Données: ${response.data}');
 
     return AuthResponseModel.fromJson(response.data['data']);
   }

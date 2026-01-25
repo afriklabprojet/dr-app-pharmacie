@@ -8,6 +8,7 @@ import '../../features/notifications/presentation/pages/notifications_page.dart'
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/providers/state/auth_state.dart';
 import '../presentation/pages/splash_page.dart';
+import '../presentation/pages/onboarding_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
@@ -21,8 +22,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isRegistering = state.uri.path == '/register';
       final isRecoveringPassword = state.uri.path == '/forgot-password';
 
+      final isOnboarding = state.uri.path == '/onboarding';
+
       // Allow splash to run its course
       if (isSplash) return null;
+      
+      // Allow onboarding to run its course
+      if (isOnboarding) return null;
 
       if (!isLoggedIn &&
           !isLoggingIn &&
@@ -40,6 +46,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/', builder: (context, state) => const SplashPage()),
+      GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingPage()),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
 
       GoRoute(

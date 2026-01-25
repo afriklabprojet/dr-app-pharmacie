@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -67,26 +68,41 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
   }
 
   void _submit() {
+    debugPrint('🔘 [LoginPage] _submit() appelé');
+    debugPrint('🔘 [LoginPage] Email: ${_emailController.text}');
+    debugPrint('🔘 [LoginPage] Form valid: ${_formKey.currentState?.validate()}');
+    
     if (_formKey.currentState!.validate()) {
+      debugPrint('🔘 [LoginPage] Formulaire validé, appel de login...');
       ref
           .read(authProvider.notifier)
           .login(_emailController.text.trim(), _passwordController.text);
+    } else {
+      debugPrint('❌ [LoginPage] Validation du formulaire échouée');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     ref.listen(authProvider, (previous, next) {
+      debugPrint('👂 [LoginPage] Auth state changed: ${previous?.status} -> ${next.status}');
       if (next.status == AuthStatus.error && next.errorMessage != null) {
+        debugPrint('❌ [LoginPage] Erreur affichée: ${next.errorMessage}');
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
+      }
+      if (next.status == AuthStatus.authenticated) {
+        debugPrint('✅ [LoginPage] Authentifié - redirection vers dashboard');
+        context.go('/dashboard');
       }
     });
 
 
     final authState = ref.watch(authProvider);
     final isLoading = authState.status == AuthStatus.loading;
+    
+    debugPrint('🖼️ [LoginPage] build() - status: ${authState.status}, isLoading: $isLoading');
 
     return Scaffold(
       backgroundColor: Colors.teal[50],

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../providers/auth_di_providers.dart';
@@ -11,30 +12,57 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> checkAuthStatus() async {
+    debugPrint('🔍 [AuthNotifier] checkAuthStatus() appelé');
     final result = await _repository.getCurrentUser();
 
     result.fold(
-      (failure) => state = state.copyWith(status: AuthStatus.unauthenticated),
-      (user) =>
-          state = state.copyWith(status: AuthStatus.authenticated, user: user),
+      (failure) {
+        debugPrint('🔍 [AuthNotifier] checkAuthStatus - Pas d\'utilisateur connecté: ${failure.message}');
+        state = state.copyWith(status: AuthStatus.unauthenticated);
+      },
+      (user) {
+        debugPrint('🔍 [AuthNotifier] checkAuthStatus - Utilisateur trouvé: ${user.email}');
+        state = state.copyWith(status: AuthStatus.authenticated, user: user);
+      },
     );
   }
 
   Future<void> login(String email, String password) async {
+    debugPrint('🔐 [AuthNotifier] login() appelé avec email: $email');
+    debugPrint('🔐 [AuthNotifier] État actuel: ${state.status}');
+    
     state = state.copyWith(status: AuthStatus.loading, errorMessage: null);
+    debugPrint('🔐 [AuthNotifier] État mis à loading');
 
-    final result = await _repository.login(email: email, password: password);
+    try {
+      debugPrint('🔐 [AuthNotifier] Appel de repository.login()...');
+      final result = await _repository.login(email: email, password: password);
+      debugPrint('🔐 [AuthNotifier] Résultat reçu du repository');
 
-    result.fold(
-      (failure) => state = state.copyWith(
+      result.fold(
+        (failure) {
+          debugPrint('❌ [AuthNotifier] Échec login: ${failure.message}');
+          state = state.copyWith(
+            status: AuthStatus.error,
+            errorMessage: failure.message,
+          );
+        },
+        (authResponse) {
+          debugPrint('✅ [AuthNotifier] Login réussi pour: ${authResponse.user.email}');
+          state = state.copyWith(
+            status: AuthStatus.authenticated,
+            user: authResponse.user,
+          );
+        },
+      );
+    } catch (e, stackTrace) {
+      debugPrint('💥 [AuthNotifier] Exception inattendue: $e');
+      debugPrint('💥 [AuthNotifier] StackTrace: $stackTrace');
+      state = state.copyWith(
         status: AuthStatus.error,
-        errorMessage: failure.message,
-      ),
-      (authResponse) => state = state.copyWith(
-        status: AuthStatus.authenticated,
-        user: authResponse.user,
-      ),
-    );
+        errorMessage: 'Erreur inattendue: $e',
+      );
+    }
   }
 
   Future<void> register({

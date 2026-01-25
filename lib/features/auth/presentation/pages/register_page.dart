@@ -53,68 +53,103 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   void _showSuccessDialog(BuildContext context) {
+    // S'assurer qu'aucun dialogue n'est ouvert
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+    }
+    
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.teal[50], // Light background
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.verified_user_rounded,
-                  size: 60,
-                  color: Colors.teal,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Inscription réussie !',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.teal[900],
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Votre demande a été envoyée avec succès.\n\nL\'administrateur doit approuver votre compte avant que vous puissiez vous connecter. Vous serez contacté prochainement.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[700],
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: FilledButton(
-                  onPressed: () {
-                    context.go('/login');
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+      useRootNavigator: true,
+      builder: (dialogContext) => WillPopScope(
+        onWillPop: () async => false, // Empêcher la fermeture avec le bouton retour
+        child: Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.teal[50],
+                    shape: BoxShape.circle,
                   ),
-                  child: const Text(
-                    'Retour à la connexion',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Icon(
+                    Icons.verified_user_rounded,
+                    size: 60,
+                    color: Colors.teal,
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                Text(
+                  'Inscription réussie !',
+                  style: Theme.of(dialogContext).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal[900],
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Votre demande a été envoyée avec succès.\n\nL\'administrateur doit approuver votre compte avant que vous puissiez vous connecter. Vous serez notifié par email.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[700],
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Info box
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Délai d\'approbation : 24-48h',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      context.go('/login');
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Retour à la connexion',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -124,10 +159,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     ref.listen(authProvider, (previous, next) {
+      // Éviter les doublons - ne traiter que si l'état a changé
+      if (previous?.status == next.status) return;
+      
       if (next.status == AuthStatus.error && next.errorMessage != null) {
+        // Fermer tout dialogue existant d'abord
+        Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst || route is! DialogRoute);
+        
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
+          barrierDismissible: true,
+          builder: (dialogContext) => AlertDialog(
             title: const Row(
               children: [
                 Icon(Icons.error_outline, color: Colors.red),
@@ -141,7 +183,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(dialogContext).pop(),
                 child: const Text('Compris'),
               ),
             ],
@@ -151,6 +193,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           ),
         );
       } else if (next.status == AuthStatus.registered) {
+        // Inscription réussie - afficher le dialogue de succès
         _showSuccessDialog(context);
       }
     });

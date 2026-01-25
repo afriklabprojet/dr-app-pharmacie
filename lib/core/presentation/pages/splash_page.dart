@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../theme/app_colors.dart';
 import '../../../features/auth/presentation/providers/auth_provider.dart';
@@ -79,6 +80,15 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
     await Future.delayed(const Duration(seconds: 3));
 
     if (!mounted) return;
+
+    // Check if onboarding is completed
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingCompleted = prefs.getBool('pharmacy_onboarding_completed') ?? false;
+    
+    if (!onboardingCompleted) {
+      context.go('/onboarding');
+      return;
+    }
 
     // The redirection logic is mainly handled by the GoRouter redirect.
     // However, since this is the initial route, we can just trigger a refresh or push.

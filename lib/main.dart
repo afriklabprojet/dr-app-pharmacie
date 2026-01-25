@@ -7,10 +7,15 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/config/routes.dart';
+import 'core/config/env_config.dart';
 import 'core/providers/core_providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialiser la configuration d'environnement
+  await EnvConfig.init();
+  EnvConfig.printConfig();
   
   try {
     await Firebase.initializeApp(

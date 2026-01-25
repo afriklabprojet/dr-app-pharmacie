@@ -1,16 +1,21 @@
-import 'package:flutter/foundation.dart';
+import '../config/env_config.dart';
 
 class AppConstants {
   static const String appName = 'DR-PHARMA Pharmacie';
-  static String get baseUrl {
-    if (kIsWeb) return 'http://127.0.0.1:8000';
-    return 'http://10.0.2.2:8000';
-  }
-  static String get apiBaseUrl => '$baseUrl/api';
-  static String get storageBaseUrl => '$baseUrl/storage/';
+  
+  /// URL de base du serveur (utilise EnvConfig pour la configuration dynamique)
+  static String get baseUrl => EnvConfig.baseUrl;
+  
+  /// URL de base de l'API
+  static String get apiBaseUrl => EnvConfig.apiBaseUrl;
+  
+  /// URL de base pour les fichiers storage
+  static String get storageBaseUrl => EnvConfig.storageBaseUrl;
+  
+  /// Timeout des requêtes API en secondes
+  static Duration get apiTimeout => Duration(milliseconds: EnvConfig.apiTimeout);
   
   // Storage Keys
-
   static const String tokenKey = 'auth_token';
   static const String userKey = 'user_data';
 }

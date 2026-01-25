@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import '../errors/exceptions.dart';
 
@@ -9,11 +10,13 @@ class ApiClient {
   Dio get dio => _dio;
 
   ApiClient() {
+    debugPrint('🔧 [ApiClient] Initialisation - baseUrl: ${AppConstants.apiBaseUrl}');
+    
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConstants.apiBaseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        connectTimeout: AppConstants.apiTimeout,
+        receiveTimeout: AppConstants.apiTimeout,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -24,11 +27,22 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
+          debugPrint('➡️ [ApiClient] REQUEST: ${options.method} ${options.uri}');
+          debugPrint('➡️ [ApiClient] Data: ${options.data}');
           // Add auth token if available
           if (_accessToken != null) {
             options.headers['Authorization'] = 'Bearer $_accessToken';
           }
           return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          debugPrint('⬅️ [ApiClient] RESPONSE: ${response.statusCode} ${response.requestOptions.uri}');
+          return handler.next(response);
+        },
+        onError: (error, handler) {
+          debugPrint('❌ [ApiClient] ERROR: ${error.type} - ${error.message}');
+          debugPrint('❌ [ApiClient] Response: ${error.response?.data}');
+          return handler.next(error);
         },
       ),
     );
