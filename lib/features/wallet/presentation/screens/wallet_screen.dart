@@ -720,7 +720,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
 
   void _showWithdrawSheet(BuildContext context) {
     final amountController = TextEditingController();
-    String selectedMethod = 'mobile_money';
+    String selectedMethod = 'wave'; // Par défaut Wave
     bool isLoading = false;
     String? errorMessage;
     final wallet = ref.read(walletProvider).value;
@@ -827,20 +827,59 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                 ),
                 const SizedBox(height: 20),
                 
-                // Mode de paiement
-                const Text('Mode de paiement', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F))),
+                // Choix de l'opérateur
+                const Text('Choisir l\'opérateur', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F))),
                 const SizedBox(height: 12),
+                
+                // Première ligne: Wave, MTN, Orange
                 Row(
                   children: [
                     Expanded(
-                      child: _buildPaymentMethodCard(
-                        icon: Icons.phone_android,
-                        label: 'Mobile Money',
-                        isSelected: selectedMethod == 'mobile_money',
-                        onTap: () => setModalState(() => selectedMethod = 'mobile_money'),
+                      child: _buildOperatorCard(
+                        imagePath: 'assets/images/wave.png',
+                        label: 'Wave',
+                        color: const Color(0xFF1BA8F0),
+                        isSelected: selectedMethod == 'wave',
+                        onTap: () => setModalState(() => selectedMethod = 'wave'),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildOperatorCard(
+                        imagePath: 'assets/images/mtn.png',
+                        label: 'MTN',
+                        color: const Color(0xFFFFCC00),
+                        isSelected: selectedMethod == 'mtn',
+                        onTap: () => setModalState(() => selectedMethod = 'mtn'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildOperatorCard(
+                        imagePath: 'assets/images/orange.png',
+                        label: 'Orange',
+                        color: const Color(0xFFFF6600),
+                        isSelected: selectedMethod == 'orange',
+                        onTap: () => setModalState(() => selectedMethod = 'orange'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                
+                // Deuxième ligne: Moov, Virement
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildOperatorCard(
+                        imagePath: 'assets/images/moov.png',
+                        label: 'Moov',
+                        color: const Color(0xFF0066B3),
+                        isSelected: selectedMethod == 'moov',
+                        onTap: () => setModalState(() => selectedMethod = 'moov'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _buildPaymentMethodCard(
                         icon: Icons.account_balance,
@@ -849,6 +888,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                         onTap: () => setModalState(() => selectedMethod = 'bank'),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    const Expanded(child: SizedBox()), // Espace vide pour équilibrer
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -947,6 +988,61 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
               style: TextStyle(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOperatorCard({
+    required String imagePath,
+    required String label,
+    required Color color,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.15) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Text(
+                  label.substring(0, 1).toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? color : Colors.grey.shade700,
               ),
             ),
           ],
