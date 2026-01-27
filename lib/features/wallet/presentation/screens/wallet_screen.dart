@@ -3190,6 +3190,8 @@ class _WithdrawalThresholdContentState extends ConsumerState<_WithdrawalThreshol
   String? _successMessage;
   bool _hasPin = false;
   bool _hasMobileMoney = false;
+  // Config dynamique depuis Filament
+  WithdrawalConfig _config = WithdrawalConfig.defaults();
 
   @override
   void initState() {
@@ -3207,6 +3209,7 @@ class _WithdrawalThresholdContentState extends ConsumerState<_WithdrawalThreshol
           _autoWithdraw = settings.autoWithdraw;
           _hasPin = settings.hasPin;
           _hasMobileMoney = settings.hasMobileMoney;
+          _config = settings.config;
           _isLoading = false;
         });
       }
@@ -3254,6 +3257,30 @@ class _WithdrawalThresholdContentState extends ConsumerState<_WithdrawalThreshol
         });
       }
     }
+  }
+
+  // Calcule les divisions du slider selon le step de Filament
+  int get _sliderDivisions {
+    return ((_config.maxThreshold - _config.minThreshold) / _config.step).round();
+  }
+
+  // Génère les valeurs rapides basées sur les config min/max
+  List<double> get _quickValues {
+    final values = <double>[];
+    values.add(_config.minThreshold);
+    final quarter = _config.minThreshold + (_config.maxThreshold - _config.minThreshold) * 0.25;
+    final half = _config.minThreshold + (_config.maxThreshold - _config.minThreshold) * 0.5;
+    final threeQuarter = _config.minThreshold + (_config.maxThreshold - _config.minThreshold) * 0.75;
+    values.add((quarter / _config.step).round() * _config.step);
+    values.add((half / _config.step).round() * _config.step);
+    values.add((threeQuarter / _config.step).round() * _config.step);
+    return values;
+  }
+
+  String _formatQuickValue(double val) {
+    if (val >= 1000000) return '${(val / 1000000).toStringAsFixed(1)}M';
+    if (val >= 1000) return '${(val / 1000).toInt()}K';
+    return val.toInt().toString();
   }
 
   @override
@@ -3372,22 +3399,42 @@ class _WithdrawalThresholdContentState extends ConsumerState<_WithdrawalThreshol
               ),
               const SizedBox(height: 24),
               
-              // Slider
+              // Slider - utilise les configs de Filament
               Slider(
-                value: _threshold,
-                min: 10000,
-                max: 500000,
-                divisions: 49,
+                value: _threshold.clamp(_config.minThreshold, _config.maxThreshold),
+                min: _config.minThreshold,
+                max: _config.maxThreshold,
+                divisions: _sliderDivisions,
                 label: '${NumberFormat('#,###', 'fr_FR').format(_threshold)} FCFA',
                 onChanged: (val) => setState(() => _threshold = val),
                 activeColor: Colors.teal,
               ),
               
-              // Valeurs rapides
+              // Info sur les limites
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${NumberFormat('#,###', 'fr_FR').format(_config.minThreshold)}',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    ),
+                    Text(
+                      '${NumberFormat('#,###', 'fr_FR').format(_config.maxThreshold)} FCFA',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              // Valeurs rapides - dynamiques selon les configs
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [10000.0, 50000.0, 100000.0, 200000.0].map((val) {
-                  final isSelected = (_threshold - val).abs() < 1000;
+                children: _quickValues.map((val) {
+                  final isSelected = (_threshold - val).abs() < _config.step;
                   return TextButton(
                     onPressed: () => setState(() => _threshold = val),
                     style: TextButton.styleFrom(
@@ -3395,7 +3442,7 @@ class _WithdrawalThresholdContentState extends ConsumerState<_WithdrawalThreshol
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     child: Text(
-                      '${(val / 1000).toInt()}K',
+                      _formatQuickValue(val),
                       style: TextStyle(
                         color: isSelected ? Colors.teal : Colors.grey,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -3407,44 +3454,99 @@ class _WithdrawalThresholdContentState extends ConsumerState<_WithdrawalThreshol
               
               const SizedBox(height: 20),
               
-              // Auto withdraw toggle
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _autoWithdraw ? Colors.teal.withOpacity(0.1) : Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _autoWithdraw ? Colors.teal : Colors.grey.shade200,
-                    width: _autoWithdraw ? 2 : 1,
+              // Auto withdraw toggle - vérifie si autorisé globalement
+              if (!_config.autoWithdrawAllowed) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.block, color: Colors.grey.shade600),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Retrait automatique', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.grey.shade600)),
+                            Text(
+                              'Désactivé par l\'administrateur',
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.lock, color: Colors.grey.shade400, size: 20),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.autorenew_rounded, color: _autoWithdraw ? Colors.teal : Colors.grey),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Retrait automatique', style: TextStyle(fontWeight: FontWeight.w600)),
-                          Text(
-                            'Retirer automatiquement quand le solde dépasse le seuil',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                        ],
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _autoWithdraw ? Colors.teal.withOpacity(0.1) : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _autoWithdraw ? Colors.teal : Colors.grey.shade200,
+                      width: _autoWithdraw ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.autorenew_rounded, color: _autoWithdraw ? Colors.teal : Colors.grey),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Retrait automatique', style: TextStyle(fontWeight: FontWeight.w600)),
+                            Text(
+                              'Retirer automatiquement quand le solde dépasse le seuil',
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Switch(
-                      value: _autoWithdraw,
-                      onChanged: (val) => setState(() => _autoWithdraw = val),
-                      activeColor: Colors.teal,
-                    ),
-                  ],
+                      Switch(
+                        value: _autoWithdraw,
+                        onChanged: (val) => setState(() => _autoWithdraw = val),
+                        activeColor: Colors.teal,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
               
-              // Warning si retrait automatique activé mais pas de mode de paiement
-              if (_autoWithdraw && !_hasMobileMoney) ...[
+              // Warning si PIN requis mais pas configuré
+              if (_autoWithdraw && _config.requirePin && !_hasPin) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.security, color: Colors.red.shade700, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Configurez d\'abord un code PIN de retrait',
+                          style: TextStyle(fontSize: 12, color: Colors.red.shade700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              
+              // Warning si Mobile Money requis mais pas configuré
+              if (_autoWithdraw && _config.requireMobileMoney && !_hasMobileMoney) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),

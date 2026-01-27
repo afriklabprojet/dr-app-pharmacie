@@ -59,6 +59,7 @@ class WithdrawalSettings {
   final bool hasPin;
   final bool hasMobileMoney;
   final bool hasBankInfo;
+  final WithdrawalConfig config;
 
   WithdrawalSettings({
     required this.threshold,
@@ -66,7 +67,8 @@ class WithdrawalSettings {
     this.hasPin = false,
     this.hasMobileMoney = false,
     this.hasBankInfo = false,
-  });
+    WithdrawalConfig? config,
+  }) : config = config ?? WithdrawalConfig.defaults();
 
   factory WithdrawalSettings.fromJson(Map<String, dynamic> json) {
     return WithdrawalSettings(
@@ -75,6 +77,9 @@ class WithdrawalSettings {
       hasPin: json['has_pin'] ?? false,
       hasMobileMoney: json['has_mobile_money'] ?? false,
       hasBankInfo: json['has_bank_info'] ?? false,
+      config: json['config'] != null 
+          ? WithdrawalConfig.fromJson(json['config']) 
+          : WithdrawalConfig.defaults(),
     );
   }
 
@@ -85,4 +90,49 @@ class WithdrawalSettings {
     'has_mobile_money': hasMobileMoney,
     'has_bank_info': hasBankInfo,
   };
+}
+
+/// Configuration globale des seuils de retrait (depuis Filament admin)
+class WithdrawalConfig {
+  final double minThreshold;
+  final double maxThreshold;
+  final double defaultThreshold;
+  final double step;
+  final bool autoWithdrawAllowed;
+  final bool requirePin;
+  final bool requireMobileMoney;
+
+  WithdrawalConfig({
+    required this.minThreshold,
+    required this.maxThreshold,
+    required this.defaultThreshold,
+    required this.step,
+    required this.autoWithdrawAllowed,
+    required this.requirePin,
+    required this.requireMobileMoney,
+  });
+
+  factory WithdrawalConfig.defaults() {
+    return WithdrawalConfig(
+      minThreshold: 10000,
+      maxThreshold: 500000,
+      defaultThreshold: 50000,
+      step: 5000,
+      autoWithdrawAllowed: true,
+      requirePin: true,
+      requireMobileMoney: true,
+    );
+  }
+
+  factory WithdrawalConfig.fromJson(Map<String, dynamic> json) {
+    return WithdrawalConfig(
+      minThreshold: (json['min_threshold'] as num?)?.toDouble() ?? 10000,
+      maxThreshold: (json['max_threshold'] as num?)?.toDouble() ?? 500000,
+      defaultThreshold: (json['default_threshold'] as num?)?.toDouble() ?? 50000,
+      step: (json['step'] as num?)?.toDouble() ?? 5000,
+      autoWithdrawAllowed: json['auto_withdraw_allowed'] ?? true,
+      requirePin: json['require_pin'] ?? true,
+      requireMobileMoney: json['require_mobile_money'] ?? true,
+    );
+  }
 }
