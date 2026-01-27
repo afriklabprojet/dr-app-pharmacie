@@ -1,56 +1,38 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Service de configuration d'environnement
 /// Gère automatiquement les URLs selon la plateforme et l'environnement
 class EnvConfig {
-  static String? _overrideBaseUrl;
+  // ============================================================
+  // CONFIGURATION
+  // ============================================================
+  // Pour changer l'environnement, modifier cette valeur :
+  // - true  = développement (serveur local)
+  // - false = production (serveur distant)
+  // - null  = auto-détection basée sur le mode de build Flutter
+  static const bool? _forceEnvironment = null;
+  
+  // URLs de production
+  static const String _prodBaseUrl = 'https://api.drpharma.ci';
+  
+  // IP locale pour appareil physique (remplacer par votre IP si nécessaire)
+  static const String localMachineIP = '192.168.1.100';
+  
   static bool _isInitialized = false;
+  static String? _overrideBaseUrl;
   
   /// Vérifie si la configuration est initialisée
   static bool get isInitialized => _isInitialized;
   
-  /// Initialise la configuration depuis le fichier .env approprié
+  /// Initialise la configuration
   static Future<void> init({String? environment}) async {
     if (_isInitialized) {
-      debugPrint('⚠️ [EnvConfig] Déjà initialisé, ignoré');
+      debugPrint('⚠️ [EnvConfig] Déjà initialisé');
       return;
     }
-    
-    final env = environment ?? 
-        const String.fromEnvironment('ENV', defaultValue: 'development');
-    
-    debugPrint('🔧 [EnvConfig] Initialisation pour environnement: $env');
-    
-    String envFile;
-    switch (env) {
-      case 'production':
-        envFile = '.env.production';
-        break;
-      case 'staging':
-        envFile = '.env.staging';
-        break;
-      default:
-        envFile = '.env.development';
-    }
-    
-    try {
-      await dotenv.load(fileName: envFile);
-      debugPrint('✅ [EnvConfig] Chargé: $envFile');
-      _isInitialized = true;
-    } catch (e) {
-      debugPrint('⚠️ [EnvConfig] $envFile non trouvé: $e');
-      try {
-        await dotenv.load(fileName: '.env');
-        debugPrint('✅ [EnvConfig] Chargé: .env (fallback)');
-        _isInitialized = true;
-      } catch (e2) {
-        debugPrint('⚠️ [EnvConfig] Aucun fichier .env trouvé: $e2');
-        debugPrint('⚠️ [EnvConfig] Utilisation des valeurs par défaut');
-        _isInitialized = true; // Continuer avec les valeurs par défaut
-      }
-    }
+    _isInitialized = true;
+    printConfig();
   }
   
   /// Permet de surcharger l'URL de base manuellement (utile pour les tests)
@@ -58,25 +40,41 @@ class EnvConfig {
     _overrideBaseUrl = url;
   }
   
+  /// Détecte automatiquement l'environnement ou utilise la valeur forcée
+  static bool get isDevelopment {
+    if (_forceEnvironment != null) {
+      return _forceEnvironment!;
+    }
+    // Auto-détection : debug = dev, release = prod
+    return !kReleaseMode;
+  }
+  
+  /// Est en environnement de production
+  static bool get isProduction => !isDevelopment;
+  
+  /// Nom de l'environnement actuel
+  static String get environment => isDevelopment ? 'development' : 'production';
+  
+  /// Mode debug activé
+  static bool get isDebugMode => isDevelopment;
+  
   /// Retourne l'URL de base de l'API
-  /// Prend en compte: override manuel > .env > détection automatique plateforme
   static String get baseUrl {
     // 1. Override manuel (priorité maximale)
     if (_overrideBaseUrl != null && _overrideBaseUrl!.isNotEmpty) {
       return _overrideBaseUrl!;
     }
     
-    // 2. Variable d'environnement .env
-    final envUrl = dotenv.env['API_BASE_URL'];
-    if (envUrl != null && envUrl.isNotEmpty) {
-      return envUrl;
+    // 2. Production
+    if (isProduction) {
+      return _prodBaseUrl;
     }
     
-    // 3. Détection automatique selon la plateforme
+    // 3. Développement - détection automatique selon la plateforme
     return _detectPlatformUrl();
   }
   
-  /// Détecte automatiquement l'URL selon la plateforme
+  /// Détecte automatiquement l'URL selon la plateforme (dev uniquement)
   static String _detectPlatformUrl() {
     // Web
     if (kIsWeb) {
@@ -101,41 +99,23 @@ class EnvConfig {
   }
   
   /// URL de base de l'API (avec /api)
-  static String get apiBaseUrl => '$baseUrl/api';
+  static String get apiBaseUrl => '\$baseUrl/api';
   
   /// URL de base pour les fichiers storage
-  static String get storageBaseUrl => '$baseUrl/storage/';
+  static String get storageBaseUrl => '\$baseUrl/storage/';
   
   /// Timeout des requêtes API en millisecondes
-  static int get apiTimeout {
-    final timeout = dotenv.env['API_TIMEOUT'];
-    return timeout != null ? int.tryParse(timeout) ?? 15000 : 15000;
-  }
-  
-  /// Nom de l'environnement actuel
-  static String get environment => dotenv.env['APP_ENV'] ?? 'development';
-  
-  /// Mode debug activé
-  static bool get isDebugMode {
-    final debug = dotenv.env['DEBUG_MODE'];
-    return debug?.toLowerCase() == 'true' || environment == 'development';
-  }
-  
-  /// Est en environnement de production
-  static bool get isProduction => environment == 'production';
-  
-  /// Est en environnement de développement
-  static bool get isDevelopment => environment == 'development';
+  static int get apiTimeout => 15000;
   
   /// Affiche la configuration actuelle (pour debug)
   static void printConfig() {
     debugPrint('═══════════════════════════════════════');
     debugPrint('📱 [EnvConfig] Configuration actuelle:');
-    debugPrint('   Environment: $environment');
-    debugPrint('   Base URL: $baseUrl');
-    debugPrint('   API URL: $apiBaseUrl');
-    debugPrint('   Timeout: ${apiTimeout}ms');
-    debugPrint('   Debug Mode: $isDebugMode');
+    debugPrint('   Environment: \$environment');
+    debugPrint('   Base URL: \$baseUrl');
+    debugPrint('   API URL: \$apiBaseUrl');
+    debugPrint('   Timeout: \${apiTimeout}ms');
+    debugPrint('   Debug Mode: \$isDebugMode');
     debugPrint('═══════════════════════════════════════');
   }
 }
