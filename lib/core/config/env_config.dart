@@ -99,10 +99,10 @@ class EnvConfig {
   }
   
   /// URL de base de l'API (avec /api)
-  static String get apiBaseUrl => '\$baseUrl/api';
+  static String get apiBaseUrl => '$baseUrl/api';
   
   /// URL de base pour les fichiers storage
-  static String get storageBaseUrl => '\$baseUrl/storage/';
+  static String get storageBaseUrl => '$baseUrl/storage/';
   
   /// Timeout des requêtes API en millisecondes
   static int get apiTimeout => 15000;
@@ -111,11 +111,11 @@ class EnvConfig {
   static void printConfig() {
     debugPrint('═══════════════════════════════════════');
     debugPrint('📱 [EnvConfig] Configuration actuelle:');
-    debugPrint('   Environment: \$environment');
-    debugPrint('   Base URL: \$baseUrl');
-    debugPrint('   API URL: \$apiBaseUrl');
-    debugPrint('   Timeout: \${apiTimeout}ms');
-    debugPrint('   Debug Mode: \$isDebugMode');
+    debugPrint('   Environment: $environment');
+    debugPrint('   Base URL: $baseUrl');
+    debugPrint('   API URL: $apiBaseUrl');
+    debugPrint('   Timeout: ${apiTimeout}ms');
+    debugPrint('   Debug Mode: $isDebugMode');
     debugPrint('═══════════════════════════════════════');
   }
 }

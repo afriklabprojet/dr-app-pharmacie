@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/presentation/widgets/widgets.dart';
 
@@ -65,19 +66,36 @@ class _ProductSearchWidgetState extends ConsumerState<ProductSearchWidget> {
     super.dispose();
   }
 
-  void _loadSearchHistory() {
-    // TODO: Load from SharedPreferences
-    setState(() {
-      _searchHistory = [
-        'Paracétamol',
-        'Doliprane 1000mg',
-        'Vitamine C',
-        'Masques chirurgicaux',
-      ];
-    });
+  static const String _searchHistoryKey = 'product_search_history';
+
+  Future<void> _loadSearchHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final history = prefs.getStringList(_searchHistoryKey);
+      if (history != null && history.isNotEmpty) {
+        setState(() {
+          _searchHistory = history;
+        });
+      } else {
+        // Default suggestions for new users
+        setState(() {
+          _searchHistory = [
+            'Paracétamol',
+            'Doliprane 1000mg',
+            'Vitamine C',
+            'Masques chirurgicaux',
+          ];
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading search history: $e');
+      setState(() {
+        _searchHistory = [];
+      });
+    }
   }
 
-  void _saveSearchToHistory(String query) {
+  Future<void> _saveSearchToHistory(String query) async {
     if (query.trim().isEmpty) return;
     setState(() {
       _searchHistory.remove(query);
@@ -86,7 +104,37 @@ class _ProductSearchWidgetState extends ConsumerState<ProductSearchWidget> {
         _searchHistory.removeLast();
       }
     });
-    // TODO: Save to SharedPreferences
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_searchHistoryKey, _searchHistory);
+    } catch (e) {
+      debugPrint('Error saving search history: $e');
+    }
+  }
+
+  Future<void> _clearSearchHistory() async {
+    setState(() {
+      _searchHistory = [];
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_searchHistoryKey);
+    } catch (e) {
+      debugPrint('Error clearing search history: $e');
+    }
+  }
+
+  Future<void> _removeFromHistory(String query) async {
+    setState(() {
+      _searchHistory.remove(query);
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_searchHistoryKey, _searchHistory);
+    } catch (e) {
+      debugPrint('Error removing from search history: $e');
+    }
   }
 
   void _onSearchChanged(String query) {
@@ -481,9 +529,7 @@ class _ProductSearchWidgetState extends ConsumerState<ProductSearchWidget> {
             const Spacer(),
             if (_searchHistory.isNotEmpty)
               TextButton(
-                onPressed: () {
-                  setState(() => _searchHistory.clear());
-                },
+                onPressed: _clearSearchHistory,
                 child: const Text('Effacer'),
               ),
           ],
@@ -495,7 +541,19 @@ class _ProductSearchWidgetState extends ConsumerState<ProductSearchWidget> {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.history, color: Colors.grey),
             title: Text(query),
-            trailing: const Icon(Icons.north_west, size: 16, color: Colors.grey),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(Icons.close, size: 18, color: Colors.grey.shade400),
+                  onPressed: () => _removeFromHistory(query),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.north_west, size: 16, color: Colors.grey),
+              ],
+            ),
             onTap: () {
               _searchController.text = query;
               _onSearchChanged(query);

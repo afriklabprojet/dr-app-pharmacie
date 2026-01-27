@@ -197,49 +197,113 @@ class OrdersListPage extends ConsumerWidget {
   }
 
   void _showRejectDialog(BuildContext context, WidgetRef ref, int orderId) {
+    final reasonController = TextEditingController();
+    String? selectedReason;
+    
+    final commonReasons = [
+      'Produit en rupture de stock',
+      'Ordonnance invalide ou illisible',
+      'Pharmacie fermée',
+      'Délai de livraison impossible',
+      'Autre raison',
+    ];
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Refuser la commande ?'),
-        content: const Text(
-          'Cette action est irréversible. Le client sera notifié du refus.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red.shade400),
+              const SizedBox(width: 8),
+              const Text('Refuser la commande'),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Cette action est irréversible. Le client sera notifié du refus.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Raison du refus :',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...commonReasons.map((reason) => RadioListTile<String>(
+                  title: Text(reason, style: const TextStyle(fontSize: 14)),
+                  value: reason,
+                  groupValue: selectedReason,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (value) {
+                    setState(() => selectedReason = value);
+                  },
+                )),
+                if (selectedReason == 'Autre raison') ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: reasonController,
+                    decoration: const InputDecoration(
+                      hintText: 'Précisez la raison...',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    maxLines: 2,
+                  ),
+                ],
+              ],
             ),
-            onPressed: () async {
-              Navigator.pop(context);
-              HapticFeedback.mediumImpact();
-              try {
-                await ref.read(orderListProvider.notifier).rejectOrder(orderId);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Commande refusée'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erreur: ${e.toString()}'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Refuser'),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              onPressed: selectedReason == null ? null : () async {
+                Navigator.pop(context);
+                HapticFeedback.mediumImpact();
+                
+                final reason = selectedReason == 'Autre raison'
+                    ? reasonController.text.trim()
+                    : selectedReason;
+                
+                try {
+                  await ref.read(orderListProvider.notifier).rejectOrder(
+                    orderId,
+                    reason: reason,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Commande refusée'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Erreur: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('Refuser'),
+            ),
+          ],
+        ),
       ),
     );
   }

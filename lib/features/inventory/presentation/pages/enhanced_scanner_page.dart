@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../../core/presentation/widgets/widgets.dart';
@@ -153,6 +154,120 @@ class _EnhancedScannerPageState extends ConsumerState<EnhancedScannerPage>
       // Reprendre le scanner si annulé
       setState(() => _isPaused = false);
       _controller.start();
+    }
+  }
+
+  /// Scanner un code-barres depuis une image de la galerie
+  Future<void> _scanFromGallery() async {
+    final ImagePicker picker = ImagePicker();
+    
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 100,
+      );
+      
+      if (image == null) return;
+      
+      // Pause le scanner pendant l'analyse
+      setState(() => _isPaused = true);
+      _controller.stop();
+      
+      // Afficher un indicateur de chargement
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Analyse de l\'image...'),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      
+      // Utiliser MobileScannerController pour analyser l'image
+      final BarcodeCapture? result = await _controller.analyzeImage(image.path);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+      
+      if (result != null && result.barcodes.isNotEmpty) {
+        final code = result.barcodes.first.rawValue;
+        if (code != null && mounted) {
+          HapticFeedback.mediumImpact();
+          setState(() {
+            _lastScannedCode = code;
+            if (!_recentScans.contains(code)) {
+              _recentScans.insert(0, code);
+              if (_recentScans.length > 10) {
+                _recentScans.removeLast();
+              }
+            }
+          });
+          _showProductResult(code);
+          return;
+        }
+      }
+      
+      // Aucun code-barres trouvé
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.warning_amber, color: Colors.white),
+                const SizedBox(width: 8),
+                const Text('Aucun code-barres détecté dans l\'image'),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.orange.shade700,
+            action: SnackBarAction(
+              label: 'Réessayer',
+              textColor: Colors.white,
+              onPressed: _scanFromGallery,
+            ),
+          ),
+        );
+        
+        // Reprendre le scanner
+        setState(() => _isPaused = false);
+        _controller.start();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Erreur: ${e.toString()}')),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+          ),
+        );
+        
+        // Reprendre le scanner
+        setState(() => _isPaused = false);
+        _controller.start();
+      }
     }
   }
 
@@ -365,15 +480,7 @@ class _EnhancedScannerPageState extends ConsumerState<EnhancedScannerPage>
             _ControlButton(
               icon: Icons.photo_library,
               label: 'Galerie',
-              onTap: () {
-                // TODO: Implement image picker for QR code
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fonctionnalité à venir'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
+              onTap: _scanFromGallery,
             ),
             
             // History Button

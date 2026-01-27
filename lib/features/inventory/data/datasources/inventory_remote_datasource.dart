@@ -12,6 +12,9 @@ abstract class InventoryRemoteDataSource {
   Future<void> updateStock(int productId, int newQuantity);
   Future<void> updatePrice(int productId, double newPrice);
   Future<void> toggleAvailability(int productId);
+  Future<void> applyPromotion(int productId, double discountPercentage, {DateTime? endDate});
+  Future<void> removePromotion(int productId);
+  Future<void> markAsLoss(int productId, int quantity, String reason);
   Future<ProductModel> addProduct(Map<String, dynamic> productData, {XFile? image});
   Future<ProductModel> updateProduct(int id, Map<String, dynamic> productData, {XFile? image});
   Future<void> deleteProduct(int id);
@@ -122,6 +125,33 @@ class InventoryRemoteDataSourceImpl implements InventoryRemoteDataSource {
   @override
   Future<void> deleteProduct(int id) async {
     await apiClient.delete('/pharmacy/inventory/$id');
+  }
+
+  @override
+  Future<void> applyPromotion(int productId, double discountPercentage, {DateTime? endDate}) async {
+    await apiClient.post(
+      '/pharmacy/inventory/$productId/promotion',
+      data: {
+        'discount_percentage': discountPercentage,
+        if (endDate != null) 'end_date': endDate.toIso8601String(),
+      },
+    );
+  }
+
+  @override
+  Future<void> removePromotion(int productId) async {
+    await apiClient.delete('/pharmacy/inventory/$productId/promotion');
+  }
+
+  @override
+  Future<void> markAsLoss(int productId, int quantity, String reason) async {
+    await apiClient.post(
+      '/pharmacy/inventory/$productId/loss',
+      data: {
+        'quantity': quantity,
+        'reason': reason,
+      },
+    );
   }
 
   @override

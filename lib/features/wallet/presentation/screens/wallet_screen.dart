@@ -1,332 +1,715 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
+import '../../data/models/wallet_data.dart';
 import '../providers/wallet_provider.dart';
 
-class WalletScreen extends ConsumerWidget {
+class WalletScreen extends ConsumerStatefulWidget {
   const WalletScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WalletScreen> createState() => _WalletScreenState();
+}
+
+class _WalletScreenState extends ConsumerState<WalletScreen>
+    with SingleTickerProviderStateMixin {
+  String _selectedPeriod = 'Ce mois';
+  final List<String> _periods = [
+    'Aujourd hui',
+    'Cette semaine',
+    'Ce mois',
+    'Cette annee'
+  ];
+
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
+    );
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final walletAsync = ref.watch(walletProvider);
-    final primaryColor = Theme.of(context).colorScheme.primary;
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
+        child: walletAsync.when(
+          data: (wallet) => _buildContent(context, wallet, primaryColor),
+          loading: () => _buildLoadingState(context),
+          error: (err, stack) => _buildErrorState(context, err),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, WalletData wallet, Color primaryColor) {
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(child: _buildHeader(context, primaryColor)),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+            child: _buildMainBalanceCard(context, wallet, primaryColor),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+            child: _buildQuickActions(context),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+            child: _buildStatsSection(context, wallet),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+            child: _buildTransactionsHeader(context),
+          ),
+        ),
+        _buildTransactionsList(context, wallet),
+        const SliverToBoxAdapter(child: SizedBox(height: 100)),
+      ],
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, Color primaryColor) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [primaryColor, primaryColor.withOpacity(0.85)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Finance & Gains',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Portefeuille',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              _buildHeaderAction(
+                icon: Icons.notifications_outlined,
+                onTap: () {},
+                showBadge: true,
+              ),
+              const SizedBox(width: 8),
+              _buildHeaderAction(
+                icon: Icons.refresh_rounded,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  ref.refresh(walletProvider);
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderAction({
+    required IconData icon,
+    required VoidCallback onTap,
+    bool showBadge = false,
+  }) {
+    return Material(
+      color: Colors.white.withOpacity(0.15),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          child: showBadge
+              ? Consumer(
+                  builder: (context, ref, child) {
+                    final unreadCount = ref.watch(unreadNotificationCountProvider);
+                    return Badge(
+                      isLabelVisible: unreadCount > 0,
+                      label: Text(unreadCount.toString()),
+                      backgroundColor: Colors.red,
+                      smallSize: 8,
+                      child: Icon(icon, size: 22, color: Colors.white),
+                    );
+                  },
+                )
+              : Icon(icon, size: 22, color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainBalanceCard(BuildContext context, WalletData wallet, Color primaryColor) {
+    final currencyFormat = NumberFormat.currency(locale: 'fr_FR', symbol: 'FCFA', decimalDigits: 0);
+
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1E3A5F), Color(0xFF2D5A87)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E3A5F).withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // En-tête amélioré
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Row(
-                children: [
-                  // Icône avec fond dégradé
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.green.shade600,
-                          Colors.green.shade300,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.green.withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      child: const Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: Colors.white,
-                      size: 26,
+                    const SizedBox(width: 12),
+                    Text(
+                      'Solde disponible',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
                   ),
-                  const SizedBox(width: 16),
-                  
-                  // Titre et sous-titre
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Finance & Gains',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.black87,
-                            letterSpacing: -0.5,
-                            height: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Suivez vos revenus et transactions',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Actions
-                  Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Colors.green,
                           shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: Icon(Icons.refresh_rounded, size: 24, color: primaryColor),
-                          onPressed: () => ref.refresh(walletProvider),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: Consumer(
-                            builder: (context, ref, child) {
-                              final unreadCount = ref.watch(unreadNotificationCountProvider);
-                              return Badge(
-                                isLabelVisible: unreadCount > 0,
-                                backgroundColor: Colors.redAccent,
-                                smallSize: 10,
-                                label: unreadCount > 0 ? null : null,
-                                child: const Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 28),
-                              );
-                            },
-                          ),
-                          onPressed: () => context.push('/notifications'),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Actif',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              currencyFormat.format(wallet.balance),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 36,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -1,
               ),
             ),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildBalanceAction(
+                    icon: Icons.arrow_upward_rounded,
+                    label: 'Retrait',
+                    onTap: () => _showWithdrawSheet(context),
+                    filled: true,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildBalanceAction(
+                    icon: Icons.history_rounded,
+                    label: 'Historique',
+                    onTap: () => _showHistorySheet(context),
+                    filled: false,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _buildBalanceAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required bool filled,
+  }) {
+    return Material(
+      color: filled ? Colors.white : Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: filled
+              ? null
+              : BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: filled ? const Color(0xFF1E3A5F) : Colors.white),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: filled ? const Color(0xFF1E3A5F) : Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    final walletAsync = ref.watch(walletProvider);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Actions rapides',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
             Expanded(
-              child: walletAsync.when(
-                data: (wallet) => SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildBalanceCard(context, wallet),
-                      const SizedBox(height: 16),
-                      
-                      Row(
-                        children: [
-                          Expanded(child: _buildStatCard(
-                            context,
-                            'Total Ventes', 
-                            wallet.totalEarnings, 
-                            const Color(0xFF2E7D32), // Green
-                            Icons.monetization_on_outlined
-                          )),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildStatCard(
-                            context,
-                            'Transactions', 
-                            wallet.transactions.length.toDouble(), 
-                            const Color(0xFF1565C0), // Blue
-                            Icons.receipt_long_outlined,
-                            isCurrency: false
-                          )),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 24),
-                      
-                      const Text(
-                        'Historique récent',
-                        style: TextStyle(
-                          fontSize: 20, 
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black87,
-                          letterSpacing: -0.5
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      
-                      if (wallet.transactions.isEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: Colors.grey.shade200),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF8D8D8D).withOpacity(0.05),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[50], // Fond très léger pour l'icône
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(Icons.receipt_long_rounded, size: 32, color: Colors.grey[400]),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Aucune transaction récente', 
-                                style: TextStyle(
-                                  color: Colors.grey[800],
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Vos mouvements financiers apparaîtront ici.', 
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: wallet.transactions.length,
-                          itemBuilder: (context, index) {
-                            final tx = wallet.transactions[index];
-                            final isCredit = tx.type == 'credit';
-                            
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(24),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF8D8D8D).withOpacity(0.08),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                leading: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isCredit ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                                    color: isCredit ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
-                                    size: 24,
-                                  ),
-                                ),
-                                title: Text(
-                                  tx.description ?? 'Transaction',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700, 
-                                    fontSize: 16
-                                  ),
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      if (tx.reference != null) 
-                                        Container(
-                                          margin: const EdgeInsets.only(bottom: 4),
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[100],
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            'REF: ${tx.reference}',
-                                            style: TextStyle(
-                                              fontSize: 10, 
-                                              color: Colors.grey[600],
-                                              fontWeight: FontWeight.w600
-                                            )
-                                          ),
-                                        ),
-                                      Text(
-                                        tx.date ?? '',
-                                        style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                trailing: Text(
-                                  '${isCredit ? '+' : '-'} ${NumberFormat.currency(symbol: '', decimalDigits: 0).format(tx.amount)} FCFA',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: isCredit ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                    ],
-                  ),
+              child: _buildQuickActionCard(
+                icon: Icons.download_rounded,
+                label: 'Exporter',
+                subtitle: 'Releve PDF',
+                color: const Color(0xFF6C63FF),
+                onTap: () => _showExportSheet(context),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickActionCard(
+                icon: Icons.analytics_outlined,
+                label: 'Statistiques',
+                subtitle: 'Analyses',
+                color: const Color(0xFF00BFA5),
+                onTap: () => walletAsync.whenData((wallet) => _showStatisticsSheet(context, wallet)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildQuickActionCard(
+                icon: Icons.settings_outlined,
+                label: 'Parametres',
+                subtitle: 'Compte',
+                color: const Color(0xFFFF6B6B),
+                onTap: () => _showSettingsSheet(context),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionCard({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                loading: () => Center(
-                  child: CircularProgressIndicator(
-                    color: Theme.of(context).primaryColor,
-                  ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F)),
+              ),
+              const SizedBox(height: 2),
+              Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsSection(BuildContext context, WalletData wallet) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Apercu financier',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _selectedPeriod,
+                  icon: Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey.shade600, size: 20),
+                  isDense: true,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                  items: _periods.map((period) => DropdownMenuItem(value: period, child: Text(period))).toList(),
+                  onChanged: (value) {
+                    if (value != null) setState(() => _selectedPeriod = value);
+                  },
                 ),
-                error: (err, stack) => Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.warning_amber_rounded, size: 60, color: Colors.orange[300]),
-                      const SizedBox(height: 16),
-                      Text('Une erreur est survenue', style: TextStyle(color: Colors.grey[800], fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Text(err.toString().length > 50 ? '${err.toString().substring(0, 50)}...' : err.toString(), style: TextStyle(color: Colors.grey[600])),
-                      const SizedBox(height: 24),
-                      ElevatedButton.icon(
-                        onPressed: () => ref.refresh(walletProvider),
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Réessayer'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                        ),
-                      )
-                    ],
-                  ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                title: 'Total gains',
+                value: wallet.totalEarnings,
+                icon: Icons.trending_up_rounded,
+                color: const Color(0xFF00BFA5),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                title: 'Solde',
+                value: wallet.balance,
+                icon: Icons.account_balance_wallet_rounded,
+                color: const Color(0xFF6C63FF),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard({
+    required String title,
+    required double value,
+    required IconData icon,
+    required Color color,
+  }) {
+    final currencyFormat = NumberFormat.currency(locale: 'fr_FR', symbol: 'FCFA', decimalDigits: 0);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 4),
+                Text(
+                  currencyFormat.format(value),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
                 ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionsHeader(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Transactions recentes',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+        ),
+        TextButton.icon(
+          onPressed: () => _showHistorySheet(context),
+          icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+          label: const Text('Voir tout'),
+          style: TextButton.styleFrom(foregroundColor: Theme.of(context).primaryColor),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTransactionsList(BuildContext context, WalletData wallet) {
+    final transactions = wallet.transactions;
+
+    if (transactions.isEmpty) {
+      return SliverToBoxAdapter(child: _buildEmptyTransactions());
+    }
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final tx = transactions[index];
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            child: _buildTransactionCard(tx),
+          );
+        },
+        childCount: transactions.length > 5 ? 5 : transactions.length,
+      ),
+    );
+  }
+
+  Widget _buildTransactionCard(WalletTransaction tx) {
+    final isCredit = tx.type == 'credit';
+    final currencyFormat = NumberFormat.currency(locale: 'fr_FR', symbol: 'FCFA', decimalDigits: 0);
+    final sign = isCredit ? '+' : '-';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isCredit ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              isCredit ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+              color: isCredit ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tx.description ?? 'Transaction',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(tx.date ?? '', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              ],
+            ),
+          ),
+          Text(
+            '$sign${currencyFormat.format(tx.amount)}',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: isCredit ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyTransactions() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
+            child: Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey.shade400),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Aucune transaction',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+          ),
+          const SizedBox(height: 8),
+          Text('Vos transactions apparaitront ici', style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: Theme.of(context).primaryColor),
+          const SizedBox(height: 20),
+          Text('Chargement...', style: TextStyle(color: Colors.grey.shade600, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(BuildContext context, Object err) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
+              child: Icon(Icons.error_outline_rounded, size: 48, color: Colors.red.shade400),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Une erreur est survenue',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+            ),
+            const SizedBox(height: 8),
+            Text(err.toString(), style: TextStyle(fontSize: 14, color: Colors.grey.shade500), textAlign: TextAlign.center),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => ref.refresh(walletProvider),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Reessayer'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ],
@@ -335,180 +718,2444 @@ class WalletScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildBalanceCard(BuildContext context, dynamic wallet) {
-    // Calcul de couleurs plus douces et professionnelles basées sur la couleur primaire
-    final primary = Theme.of(context).primaryColor;
-    final deepPrimary = Color.lerp(primary, const Color(0xFF202020), 0.3) ?? primary;
-    final softPrimary = Color.lerp(primary, Colors.white, 0.1) ?? primary;
+  void _showWithdrawSheet(BuildContext context) {
+    final amountController = TextEditingController();
+    String selectedMethod = 'mobile_money';
+    bool isLoading = false;
+    final wallet = ref.read(walletProvider).value;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
-        // Dégradé plus subtil et profond pour un look "Finance Premium"
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            deepPrimary,
-            softPrimary,
-          ],
-          stops: const [0.2, 1.0],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: deepPrimary.withOpacity(0.25), // Ombre moins saturée
-            blurRadius: 30, // Plus diffus
-            offset: const Offset(0, 15),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-        ],
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Demande de retrait',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+                ),
+                const SizedBox(height: 8),
+                if (wallet != null)
+                  Text(
+                    'Solde disponible: ${NumberFormat.currency(locale: 'fr_FR', symbol: 'FCFA', decimalDigits: 0).format(wallet.balance)}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  ),
+                const SizedBox(height: 24),
+                
+                // Montant
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Montant (FCFA)',
+                    prefixIcon: Icon(Icons.payments_outlined, color: Colors.grey.shade400),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: Theme.of(ctx).primaryColor, width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Montants rapides
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [10000, 25000, 50000, 100000].map((amount) {
+                    return TextButton(
+                      onPressed: () {
+                        amountController.text = amount.toString();
+                        setModalState(() {});
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        backgroundColor: Colors.grey.shade100,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text('${amount ~/ 1000}K', style: TextStyle(color: Colors.grey.shade700)),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                
+                // Mode de paiement
+                const Text('Mode de paiement', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildPaymentMethodCard(
+                        icon: Icons.phone_android,
+                        label: 'Mobile Money',
+                        isSelected: selectedMethod == 'mobile_money',
+                        onTap: () => setModalState(() => selectedMethod = 'mobile_money'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildPaymentMethodCard(
+                        icon: Icons.account_balance,
+                        label: 'Virement',
+                        isSelected: selectedMethod == 'bank',
+                        onTap: () => setModalState(() => selectedMethod = 'bank'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : () async {
+                      final amount = double.tryParse(amountController.text);
+                      if (amount == null || amount <= 0) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Veuillez entrer un montant valide'),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      if (wallet != null && amount > wallet.balance) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Solde insuffisant'),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      setModalState(() => isLoading = true);
+                      
+                      try {
+                        final response = await ref.read(walletActionsProvider.notifier).requestWithdrawal(
+                          amount: amount,
+                          paymentMethod: selectedMethod,
+                        );
+                        
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(Icons.check_circle, color: Colors.white),
+                                const SizedBox(width: 12),
+                                Expanded(child: Text(response.message.isNotEmpty ? response.message : 'Demande de retrait envoyee')),
+                              ],
+                            ),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      } catch (e) {
+                        setModalState(() => isLoading = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Erreur: $e'),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: isLoading 
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Confirmer le retrait', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodCard({
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.1) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Theme.of(context).primaryColor : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: isSelected ? Theme.of(context).primaryColor : Colors.grey, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHistorySheet(BuildContext context) {
+    final walletAsync = ref.watch(walletProvider);
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Historique complet',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: walletAsync.when(
+                  data: (wallet) {
+                    if (wallet.transactions.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
+                            const SizedBox(height: 16),
+                            Text('Aucune transaction', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      );
+                    }
+                    return ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: wallet.transactions.length,
+                      itemBuilder: (context, index) {
+                        final tx = wallet.transactions[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildTransactionCard(tx),
+                        );
+                      },
+                    );
+                  },
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Center(child: Text('Erreur: $e')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showExportSheet(BuildContext context) {
+    String selectedFormat = 'PDF';
+    String selectedPeriod = 'Ce mois';
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6C63FF).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.download_rounded, color: Color(0xFF6C63FF), size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Exporter le releve', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                          SizedBox(height: 4),
+                          Text('Telecharger vos transactions', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text('Format', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _buildFormatOption('PDF', selectedFormat, Icons.picture_as_pdf_rounded, Colors.red, (val) => setModalState(() => selectedFormat = val)),
+                    const SizedBox(width: 12),
+                    _buildFormatOption('Excel', selectedFormat, Icons.table_chart_rounded, Colors.green, (val) => setModalState(() => selectedFormat = val)),
+                    const SizedBox(width: 12),
+                    _buildFormatOption('CSV', selectedFormat, Icons.description_rounded, Colors.blue, (val) => setModalState(() => selectedFormat = val)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text('Periode', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: ['Cette semaine', 'Ce mois', 'Ce trimestre', 'Cette annee', 'Tout'].map((period) {
+                    final isSelected = selectedPeriod == period;
+                    return GestureDetector(
+                      onTap: () => setModalState(() => selectedPeriod = period),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).primaryColor : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          period,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.download_done_rounded, color: Colors.white),
+                              const SizedBox(width: 12),
+                              Text('Export $selectedFormat en cours...'),
+                            ],
+                          ),
+                          backgroundColor: const Color(0xFF6C63FF),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.download_rounded),
+                    label: Text('Exporter en $selectedFormat'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6C63FF),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormatOption(String format, String selected, IconData icon, Color color, Function(String) onSelect) {
+    final isSelected = format == selected;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onSelect(format),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.1) : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isSelected ? color : Colors.grey.shade200, width: 2),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: isSelected ? color : Colors.grey.shade400, size: 28),
+              const SizedBox(height: 8),
+              Text(format, style: TextStyle(color: isSelected ? color : Colors.grey.shade600, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showStatisticsSheet(BuildContext context, WalletData wallet) {
+    final currencyFormat = NumberFormat.currency(locale: 'fr_FR', symbol: 'FCFA', decimalDigits: 0);
+    
+    // Calculer les statistiques
+    final totalCredits = wallet.transactions.where((t) => t.type == 'credit').fold<double>(0, (sum, t) => sum + t.amount);
+    final totalDebits = wallet.transactions.where((t) => t.type == 'debit').fold<double>(0, (sum, t) => sum + t.amount);
+    final nbTransactions = wallet.transactions.length;
+    final avgTransaction = nbTransactions > 0 ? (totalCredits + totalDebits) / nbTransactions : 0.0;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.75,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00BFA5).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.analytics_rounded, color: Color(0xFF00BFA5), size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    const Text('Statistiques detaillees', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                
+                // Revenus vs Depenses
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatBox(
+                        title: 'Total Revenus',
+                        value: currencyFormat.format(totalCredits),
+                        icon: Icons.arrow_downward_rounded,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatBox(
+                        title: 'Total Depenses',
+                        value: currencyFormat.format(totalDebits),
+                        icon: Icons.arrow_upward_rounded,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatBox(
+                        title: 'Transactions',
+                        value: nbTransactions.toString(),
+                        icon: Icons.receipt_long_rounded,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatBox(
+                        title: 'Moyenne',
+                        value: currencyFormat.format(avgTransaction),
+                        icon: Icons.trending_flat_rounded,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                
+                // Graphique simple
+                const Text('Repartition', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildProgressBar('Revenus', totalCredits, totalCredits + totalDebits, Colors.green),
+                      const SizedBox(height: 16),
+                      _buildProgressBar('Depenses', totalDebits, totalCredits + totalDebits, Colors.red),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                
+                // Resume
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [const Color(0xFF1E3A5F), const Color(0xFF2D5A87)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Solde Net', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                          SizedBox(height: 4),
+                        ],
+                      ),
+                      Text(
+                        currencyFormat.format(totalCredits - totalDebits),
+                        style: TextStyle(
+                          color: (totalCredits - totalDebits) >= 0 ? Colors.greenAccent : Colors.redAccent,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatBox({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15), // Transparence plus subtile
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)), // Bordure fine
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 12),
+          Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          const SizedBox(height: 4),
+          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressBar(String label, double value, double total, Color color) {
+    final percentage = total > 0 ? (value / total * 100) : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+            Text('${percentage.toStringAsFixed(1)}%', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: percentage / 100,
+            backgroundColor: Colors.grey.shade200,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 8,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showSettingsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
                 ),
-                child: const Row(
+                const SizedBox(height: 24),
+                Row(
                   children: [
-                    Icon(Icons.wallet_rounded, color: Colors.white70, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      'Solde Disponible',
-                      style: TextStyle(
-                        color: Colors.white, 
-                        fontSize: 13, 
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.5,
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF6B6B).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.settings_rounded, color: Color(0xFFFF6B6B), size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    const Text('Parametres du compte', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                
+                _buildSettingItem(
+                  icon: Icons.account_balance_rounded,
+                  title: 'Informations bancaires',
+                  subtitle: 'Modifier vos coordonnees bancaires',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showBankInfoSheet(context);
+                  },
+                ),
+                _buildSettingItem(
+                  icon: Icons.phone_android_rounded,
+                  title: 'Mobile Money',
+                  subtitle: 'Gerer vos comptes Mobile Money',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showMobileMoneySheet(context);
+                  },
+                ),
+                _buildSettingItem(
+                  icon: Icons.notifications_active_rounded,
+                  title: 'Notifications',
+                  subtitle: 'Gerer les alertes de paiement',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showNotificationSettingsSheet(context);
+                  },
+                ),
+                _buildSettingItem(
+                  icon: Icons.security_rounded,
+                  title: 'Securite',
+                  subtitle: 'PIN et authentification',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showSecuritySettingsSheet(context);
+                  },
+                ),
+                _buildSettingItem(
+                  icon: Icons.receipt_long_rounded,
+                  title: 'Releves automatiques',
+                  subtitle: 'Configurer les exports periodiques',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showAutoReportSettingsSheet(context);
+                  },
+                ),
+                _buildSettingItem(
+                  icon: Icons.account_balance_wallet_rounded,
+                  title: 'Seuil de retrait',
+                  subtitle: 'Configurer le montant minimum',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showWithdrawalThresholdSheet(context);
+                  },
+                ),
+                _buildSettingItem(
+                  icon: Icons.help_outline_rounded,
+                  title: 'Aide et support',
+                  subtitle: 'FAQ et contact',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showHelpSheet(context);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===== INFORMATIONS BANCAIRES =====
+  void _showBankInfoSheet(BuildContext context) {
+    final bankNameController = TextEditingController();
+    final accountNumberController = TextEditingController();
+    final ibanController = TextEditingController();
+    final holderNameController = TextEditingController();
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.account_balance_rounded, color: Colors.blue, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Informations bancaires', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                        Text('Pour recevoir vos paiements', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              // Nom de la banque
+              TextField(
+                controller: bankNameController,
+                decoration: InputDecoration(
+                  labelText: 'Nom de la banque',
+                  hintText: 'Ex: Ecobank, SGBCI, BOA...',
+                  prefixIcon: const Icon(Icons.business),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Titulaire du compte
+              TextField(
+                controller: holderNameController,
+                decoration: InputDecoration(
+                  labelText: 'Titulaire du compte',
+                  hintText: 'Nom complet',
+                  prefixIcon: const Icon(Icons.person),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Numero de compte
+              TextField(
+                controller: accountNumberController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Numero de compte',
+                  hintText: 'XXXX XXXX XXXX XXXX',
+                  prefixIcon: const Icon(Icons.numbers),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // IBAN / RIB
+              TextField(
+                controller: ibanController,
+                decoration: InputDecoration(
+                  labelText: 'IBAN / RIB (optionnel)',
+                  hintText: 'CI XX XXXX XXXX XXXX XXXX XXXX XXX',
+                  prefixIcon: const Icon(Icons.credit_card),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Info
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.amber.shade700, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Ces informations sont securisees et utilisees uniquement pour les virements.',
+                        style: TextStyle(fontSize: 12, color: Colors.amber.shade800),
                       ),
                     ),
                   ],
                 ),
               ),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.info_outline_rounded, 
-                  color: Colors.white.withOpacity(0.9), 
-                  size: 18
+              const SizedBox(height: 24),
+              
+              SizedBox(
+                width: double.infinity,
+                child: StatefulBuilder(
+                  builder: (context, setButtonState) {
+                    bool isLoading = false;
+                    return ElevatedButton(
+                      onPressed: isLoading ? null : () async {
+                        if (bankNameController.text.isEmpty || 
+                            holderNameController.text.isEmpty || 
+                            accountNumberController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Veuillez remplir tous les champs obligatoires'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                          return;
+                        }
+                        
+                        setButtonState(() => isLoading = true);
+                        
+                        try {
+                          await ref.read(walletActionsProvider.notifier).saveBankInfo(
+                            bankName: bankNameController.text,
+                            holderName: holderNameController.text,
+                            accountNumber: accountNumberController.text,
+                            iban: ibanController.text.isNotEmpty ? ibanController.text : null,
+                          );
+                          
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: Colors.white),
+                                  SizedBox(width: 12),
+                                  Text('Informations bancaires enregistrees'),
+                                ],
+                              ),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        } catch (e) {
+                          setButtonState(() => isLoading = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erreur: $e'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: isLoading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    );
+                  },
                 ),
               ),
+              const SizedBox(height: 16),
             ],
           ),
-          const SizedBox(height: 28),
-          // Mise en valeur du montant (La star)
-          Text(
-            NumberFormat.currency(symbol: 'FCFA', decimalDigits: 0, locale: 'fr_FR').format(wallet.balance),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 40, // Plus grand
-              fontWeight: FontWeight.w700, // Moins gras (w800 -> w700) pour plus d'élégance
-              letterSpacing: -1.5,
-              height: 1.0,
+        ),
+      ),
+    );
+  }
+
+  // ===== MOBILE MONEY =====
+  void _showMobileMoneySheet(BuildContext context) {
+    String selectedOperator = 'Orange Money';
+    final phoneController = TextEditingController();
+    final nameController = TextEditingController();
+    bool isLoading = false;
+    bool isPrimary = true;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.phone_android_rounded, color: Colors.orange, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Mobile Money', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                          Text('Recevoir sur votre compte mobile', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                // Operateurs
+                const Text('Choisir l\'operateur', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _buildOperatorChip('Orange Money', 'orange', selectedOperator == 'Orange Money', () {
+                      setModalState(() => selectedOperator = 'Orange Money');
+                    }),
+                    const SizedBox(width: 8),
+                    _buildOperatorChip('MTN MoMo', 'mtn', selectedOperator == 'MTN MoMo', () {
+                      setModalState(() => selectedOperator = 'MTN MoMo');
+                    }),
+                    const SizedBox(width: 8),
+                    _buildOperatorChip('Moov Money', 'moov', selectedOperator == 'Moov Money', () {
+                      setModalState(() => selectedOperator = 'Moov Money');
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                
+                // Numero de telephone
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: 'Numero de telephone',
+                    hintText: '+225 XX XX XX XX XX',
+                    prefixIcon: const Icon(Icons.phone),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Nom du compte
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Nom sur le compte',
+                    hintText: 'Nom du titulaire',
+                    prefixIcon: const Icon(Icons.person),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Compte principal toggle
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Compte principal', style: TextStyle(fontWeight: FontWeight.w600)),
+                            Text('Recevoir les paiements sur ce compte', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: isPrimary,
+                        onChanged: (val) => setModalState(() => isPrimary = val),
+                        activeColor: Theme.of(context).primaryColor,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : () async {
+                      if (phoneController.text.isEmpty || nameController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Veuillez remplir tous les champs'),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                        return;
+                      }
+                      
+                      setModalState(() => isLoading = true);
+                      
+                      try {
+                        await ref.read(walletActionsProvider.notifier).saveMobileMoneyInfo(
+                          operator: selectedOperator,
+                          phoneNumber: phoneController.text,
+                          accountName: nameController.text,
+                          isPrimary: isPrimary,
+                        );
+                        
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.white),
+                                SizedBox(width: 12),
+                                Text('Compte Mobile Money enregistre'),
+                              ],
+                            ),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      } catch (e) {
+                        setModalState(() => isLoading = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Erreur: $e'),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: isLoading 
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOperatorChip(String name, String code, bool isSelected, VoidCallback onTap) {
+    Color color;
+    switch (code) {
+      case 'orange':
+        color = Colors.orange;
+        break;
+      case 'mtn':
+        color = Colors.yellow.shade700;
+        break;
+      case 'moov':
+        color = Colors.blue;
+        break;
+      default:
+        color = Colors.grey;
+    }
+    
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.15) : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isSelected ? color : Colors.transparent, width: 2),
+          ),
+          child: Column(
             children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF00E676), // Point vert vif pour "Live"
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
+              Icon(Icons.phone_android, color: isSelected ? color : Colors.grey, size: 24),
+              const SizedBox(height: 4),
               Text(
-                'Mis à jour à l\'instant',
+                name.split(' ').first,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? color : Colors.grey.shade600,
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===== NOTIFICATIONS =====
+  void _showNotificationSettingsSheet(BuildContext context) {
+    bool notifyDeposit = true;
+    bool notifyWithdraw = true;
+    bool notifyWeeklyReport = false;
+    bool notifyMonthlyReport = true;
+    bool notifyThreshold = false;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.notifications_active_rounded, color: Colors.purple, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Notifications', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                          Text('Gerer vos alertes financieres', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                // Section Transactions
+                const Text('Transactions', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                _buildNotificationToggle(
+                  icon: Icons.arrow_downward_rounded,
+                  iconColor: Colors.green,
+                  title: 'Depot recu',
+                  subtitle: 'Notification a chaque paiement recu',
+                  value: notifyDeposit,
+                  onChanged: (val) => setModalState(() => notifyDeposit = val),
+                ),
+                _buildNotificationToggle(
+                  icon: Icons.arrow_upward_rounded,
+                  iconColor: Colors.red,
+                  title: 'Retrait effectue',
+                  subtitle: 'Confirmation des retraits',
+                  value: notifyWithdraw,
+                  onChanged: (val) => setModalState(() => notifyWithdraw = val),
+                ),
+                
+                const SizedBox(height: 20),
+                const Text('Rapports', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                _buildNotificationToggle(
+                  icon: Icons.calendar_view_week_rounded,
+                  iconColor: Colors.blue,
+                  title: 'Resume hebdomadaire',
+                  subtitle: 'Chaque lundi matin',
+                  value: notifyWeeklyReport,
+                  onChanged: (val) => setModalState(() => notifyWeeklyReport = val),
+                ),
+                _buildNotificationToggle(
+                  icon: Icons.calendar_month_rounded,
+                  iconColor: Colors.indigo,
+                  title: 'Resume mensuel',
+                  subtitle: 'Le 1er de chaque mois',
+                  value: notifyMonthlyReport,
+                  onChanged: (val) => setModalState(() => notifyMonthlyReport = val),
+                ),
+                
+                const SizedBox(height: 20),
+                const Text('Alertes', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                _buildNotificationToggle(
+                  icon: Icons.trending_up_rounded,
+                  iconColor: Colors.orange,
+                  title: 'Seuil de solde atteint',
+                  subtitle: 'Quand votre solde depasse un montant',
+                  value: notifyThreshold,
+                  onChanged: (val) => setModalState(() => notifyThreshold = val),
+                ),
+                
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.white),
+                              SizedBox(width: 12),
+                              Text('Preferences de notifications enregistrees'),
+                            ],
+                          ),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationToggle({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeColor: iconColor,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===== SECURITE =====
+  void _showSecuritySettingsSheet(BuildContext context) {
+    bool usePinCode = true;
+    bool useBiometric = false;
+    bool confirmWithdrawal = true;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.security_rounded, color: Colors.red, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Securite', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                          Text('Protegez votre compte', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                // Authentification
+                const Text('Authentification', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                _buildSecurityOption(
+                  icon: Icons.pin_rounded,
+                  iconColor: Colors.blue,
+                  title: 'Code PIN',
+                  subtitle: 'Proteger l\'acces avec un code a 4 chiffres',
+                  value: usePinCode,
+                  onChanged: (val) => setModalState(() => usePinCode = val),
+                  onConfigure: usePinCode ? () {
+                    Navigator.pop(ctx);
+                    _showChangePinDialog(context);
+                  } : null,
+                ),
+                _buildSecurityOption(
+                  icon: Icons.fingerprint_rounded,
+                  iconColor: Colors.green,
+                  title: 'Empreinte digitale',
+                  subtitle: 'Utiliser la biometrie pour valider',
+                  value: useBiometric,
+                  onChanged: (val) => setModalState(() => useBiometric = val),
+                ),
+                
+                const SizedBox(height: 20),
+                const Text('Transactions', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                _buildSecurityOption(
+                  icon: Icons.verified_user_rounded,
+                  iconColor: Colors.orange,
+                  title: 'Confirmer les retraits',
+                  subtitle: 'Demander confirmation pour chaque retrait',
+                  value: confirmWithdrawal,
+                  onChanged: (val) => setModalState(() => confirmWithdrawal = val),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Actions de securite
+                const Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                _buildSecurityAction(
+                  icon: Icons.history_rounded,
+                  iconColor: Colors.purple,
+                  title: 'Historique de connexion',
+                  subtitle: 'Voir les dernieres connexions',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showLoginHistorySheet(context);
+                  },
+                ),
+                _buildSecurityAction(
+                  icon: Icons.devices_rounded,
+                  iconColor: Colors.teal,
+                  title: 'Appareils connectes',
+                  subtitle: 'Gerer les sessions actives',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Aucun autre appareil connecte'),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    );
+                  },
+                ),
+                
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.white),
+                              SizedBox(width: 12),
+                              Text('Parametres de securite enregistres'),
+                            ],
+                          ),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityOption({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    VoidCallback? onConfigure,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
+            if (onConfigure != null && value)
+              IconButton(
+                onPressed: onConfigure,
+                icon: Icon(Icons.edit_rounded, color: Colors.grey.shade400, size: 20),
+                tooltip: 'Modifier',
+              ),
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeColor: iconColor,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityAction({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: iconColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showChangePinDialog(BuildContext context) {
+    final oldPinController = TextEditingController();
+    final newPinController = TextEditingController();
+    final confirmPinController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.pin_rounded, color: Color(0xFF1E3A5F)),
+            SizedBox(width: 12),
+            Text('Modifier le code PIN'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: oldPinController,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Ancien code PIN',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: newPinController,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Nouveau code PIN',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: confirmPinController,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Confirmer le code PIN',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                counterText: '',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Row(
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.white),
+                      SizedBox(width: 12),
+                      Text('Code PIN modifie avec succes'),
+                    ],
+                  ),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              );
+            },
+            child: const Text('Confirmer'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String title, double value, Color color, IconData icon, {bool isCurrency = true, String period = 'Ce mois-ci'}) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF8D8D8D).withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
+  void _showLoginHistorySheet(BuildContext context) {
+    final loginHistory = [
+      {'date': '27 Jan 2026, 14:32', 'device': 'iPhone 14 Pro', 'location': 'Abidjan, CI', 'current': true},
+      {'date': '27 Jan 2026, 09:15', 'device': 'iPhone 14 Pro', 'location': 'Abidjan, CI', 'current': false},
+      {'date': '26 Jan 2026, 18:45', 'device': 'Chrome Web', 'location': 'Abidjan, CI', 'current': false},
+      {'date': '25 Jan 2026, 11:20', 'device': 'iPhone 14 Pro', 'location': 'Abidjan, CI', 'current': false},
+    ];
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Historique de connexion', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: loginHistory.length,
+                itemBuilder: (context, index) {
+                  final login = loginHistory[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: login['current'] == true ? Colors.green.shade50 : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: login['current'] == true ? Border.all(color: Colors.green.shade200) : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          login['device'].toString().contains('iPhone') ? Icons.phone_iphone : Icons.computer,
+                          color: login['current'] == true ? Colors.green : Colors.grey,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(login['device'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  if (login['current'] == true) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Text('Actuel', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text('${login['date']} • ${login['location']}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  // ===== RELEVES AUTOMATIQUES =====
+  void _showAutoReportSettingsSheet(BuildContext context) {
+    String frequency = 'Mensuel';
+    String format = 'PDF';
+    bool autoSend = true;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.receipt_long_rounded, color: Colors.indigo, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Releves automatiques', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                          Text('Recevez vos releves par email', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                // Frequence
+                const Text('Frequence d\'envoi', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: ['Hebdomadaire', 'Mensuel', 'Trimestriel'].map((f) {
+                    final isSelected = frequency == f;
+                    return ChoiceChip(
+                      label: Text(f),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        if (selected) setModalState(() => frequency = f);
+                      },
+                      selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+                    );
+                  }).toList(),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Format
+                const Text('Format du document', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: ['PDF', 'Excel', 'CSV'].map((f) {
+                    final isSelected = format == f;
+                    return ChoiceChip(
+                      label: Text(f),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        if (selected) setModalState(() => format = f);
+                      },
+                      selectedColor: Theme.of(context).primaryColor.withOpacity(0.2),
+                    );
+                  }).toList(),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Toggle
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.email_outlined, color: Colors.indigo),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Envoi automatique', style: TextStyle(fontWeight: FontWeight.w600)),
+                            Text('Recevoir par email automatiquement', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: autoSend,
+                        onChanged: (val) => setModalState(() => autoSend = val),
+                        activeColor: Colors.indigo,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Resume
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.indigo.shade700),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Prochain releve: ${frequency == 'Hebdomadaire' ? 'Lundi prochain' : frequency == 'Mensuel' ? '1er Fevrier 2026' : '1er Avril 2026'}',
+                          style: TextStyle(fontSize: 13, color: Colors.indigo.shade700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.white),
+                              SizedBox(width: 12),
+                              Text('Releves automatiques configures'),
+                            ],
+                          ),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===== SEUIL DE RETRAIT =====
+  void _showWithdrawalThresholdSheet(BuildContext context) {
+    double threshold = 50000;
+    bool autoWithdraw = false;
+    bool isLoading = false;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Container(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.teal, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Seuil de retrait', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                          Text('Configurez le montant minimum', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                
+                // Affichage du seuil
+                Center(
+                  child: Column(
+                    children: [
+                      Text(
+                        '${NumberFormat('#,###', 'fr_FR').format(threshold)} FCFA',
+                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Montant minimum de retrait', style: TextStyle(color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Slider
+                Slider(
+                  value: threshold,
+                  min: 10000,
+                  max: 500000,
+                  divisions: 49,
+                  label: '${NumberFormat('#,###', 'fr_FR').format(threshold)} FCFA',
+                  onChanged: (val) => setModalState(() => threshold = val),
+                  activeColor: Colors.teal,
+                ),
+                
+                // Valeurs rapides
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [10000.0, 50000.0, 100000.0, 200000.0].map((val) {
+                    return TextButton(
+                      onPressed: () => setModalState(() => threshold = val),
+                      child: Text(
+                        '${(val / 1000).toInt()}K',
+                        style: TextStyle(
+                          color: threshold == val ? Colors.teal : Colors.grey,
+                          fontWeight: threshold == val ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Auto withdraw toggle
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.autorenew_rounded, color: Colors.teal),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Retrait automatique', style: TextStyle(fontWeight: FontWeight.w600)),
+                            Text('Retirer automatiquement quand le seuil est atteint', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: autoWithdraw,
+                        onChanged: (val) => setModalState(() => autoWithdraw = val),
+                        activeColor: Colors.teal,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : () async {
+                      setModalState(() => isLoading = true);
+                      
+                      try {
+                        await ref.read(walletActionsProvider.notifier).setWithdrawalThreshold(
+                          threshold: threshold,
+                          autoWithdraw: autoWithdraw,
+                        );
+                        
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                const Icon(Icons.check_circle, color: Colors.white),
+                                const SizedBox(width: 12),
+                                Text('Seuil de ${NumberFormat('#,###', 'fr_FR').format(threshold)} FCFA enregistre'),
+                              ],
+                            ),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      } catch (e) {
+                        setModalState(() => isLoading = false);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Erreur: $e'),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: isLoading
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===== AIDE ET SUPPORT =====
+  void _showHelpSheet(BuildContext context) {
+    final faqItems = [
+      {'q': 'Comment demander un retrait ?', 'a': 'Appuyez sur le bouton "Retrait" sur la carte de solde, entrez le montant souhaite et confirmez. Le virement sera effectue sous 24-48h.'},
+      {'q': 'Quels sont les frais de retrait ?', 'a': 'Les retraits sont gratuits pour les montants superieurs a 50,000 FCFA. En dessous, des frais de 500 FCFA s\'appliquent.'},
+      {'q': 'Comment modifier mes informations bancaires ?', 'a': 'Allez dans Parametres > Informations bancaires et modifiez vos coordonnees. Les changements seront verifies sous 24h.'},
+      {'q': 'Pourquoi mon retrait est en attente ?', 'a': 'Les retraits sont traites les jours ouvrables. Si votre retrait est en attente depuis plus de 48h, contactez le support.'},
+      {'q': 'Comment contacter le support ?', 'a': 'Vous pouvez nous joindre par email a support@drpharma.ci ou par telephone au +225 27 22 XX XX XX.'},
+    ];
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.cyan.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.help_outline_rounded, color: Colors.cyan, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Aide et support', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                              Text('Questions frequentes', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  children: [
+                    // FAQ
+                    ...faqItems.map((faq) => _buildFaqItem(faq['q']!, faq['a']!)),
+                    
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    
+                    // Contact
+                    const Text('Nous contacter', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                    const SizedBox(height: 16),
+                    
+                    _buildContactOption(
+                      icon: Icons.email_outlined,
+                      color: Colors.blue,
+                      title: 'Email',
+                      subtitle: 'support@drpharma.ci',
+                      onTap: () {},
+                    ),
+                    _buildContactOption(
+                      icon: Icons.phone_outlined,
+                      color: Colors.green,
+                      title: 'Telephone',
+                      subtitle: '+225 27 22 XX XX XX',
+                      onTap: () {},
+                    ),
+                    _buildContactOption(
+                      icon: Icons.chat_bubble_outline,
+                      color: Colors.purple,
+                      title: 'Chat en direct',
+                      subtitle: 'Disponible 8h - 18h',
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Chat en cours de mise en place'),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        );
+                      },
+                    ),
+                    
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFaqItem(String question, String answer) {
+    return ExpansionTile(
+      tilePadding: EdgeInsets.zero,
+      title: Text(question, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF1E3A5F))),
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Text(answer, style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.5)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContactOption({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 22),
+                ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
+                  color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade100),
                 ),
-                child: Text(
-                  period,
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Icon(icon, color: Colors.grey.shade600, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F))),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+                  ],
                 ),
               ),
+              Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            isCurrency 
-              ? NumberFormat.compactCurrency(symbol: '', decimalDigits: 0).format(value)
-              : value.toInt().toString(),
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title, 
-            style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500)
-          ),
-        ],
+        ),
       ),
     );
   }
 }
-

@@ -550,7 +550,7 @@ class _StockAlertsWidgetState extends ConsumerState<StockAlertsWidget> {
               subtitle: 'Réduire le prix pour écouler le stock',
               onTap: () {
                 Navigator.of(context).pop();
-                // TODO: Apply promotion
+                _showPromotionDialog(context, alert);
               },
             ),
             _ActionTile(
@@ -560,7 +560,7 @@ class _StockAlertsWidgetState extends ConsumerState<StockAlertsWidget> {
               subtitle: 'Marquer comme perte',
               onTap: () {
                 Navigator.of(context).pop();
-                // TODO: Remove from stock
+                _showLossDialog(context, alert);
               },
             ),
             if (alert.type == StockAlertType.expiring)
@@ -578,6 +578,520 @@ class _StockAlertsWidgetState extends ConsumerState<StockAlertsWidget> {
         ),
       ),
     );
+  }
+
+  void _showPromotionDialog(BuildContext context, StockAlert alert) {
+    double discountPercentage = 10.0;
+    DateTime startDate = DateTime.now();
+    DateTime endDate = DateTime.now().add(const Duration(days: 7));
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.discount, color: Colors.orange),
+              const SizedBox(width: 8),
+              const Text('Appliquer une promotion'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Product info
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.medication, color: Colors.grey.shade600),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          alert.productName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Discount percentage
+                const Text(
+                  'Réduction',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Slider(
+                        value: discountPercentage,
+                        min: 5,
+                        max: 70,
+                        divisions: 13,
+                        label: '${discountPercentage.toInt()}%',
+                        onChanged: (value) {
+                          setDialogState(() {
+                            discountPercentage = value;
+                          });
+                        },
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${discountPercentage.toInt()}%',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade800,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // Date range
+                const Text(
+                  'Période de promotion',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: startDate,
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 90)),
+                          );
+                          if (date != null) {
+                            setDialogState(() {
+                              startDate = date;
+                              if (endDate.isBefore(startDate)) {
+                                endDate = startDate.add(const Duration(days: 7));
+                              }
+                            });
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Début',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${startDate.day}/${startDate.month}/${startDate.year}',
+                                style: const TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Icon(Icons.arrow_forward, size: 20, color: Colors.grey),
+                    ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: endDate,
+                            firstDate: startDate,
+                            lastDate: DateTime.now().add(const Duration(days: 180)),
+                          );
+                          if (date != null) {
+                            setDialogState(() {
+                              endDate = date;
+                            });
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Fin',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${endDate.day}/${endDate.month}/${endDate.year}',
+                                style: const TextStyle(fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Call the API to apply promotion
+                _applyPromotion(
+                  int.tryParse(alert.productId) ?? 0,
+                  discountPercentage,
+                  startDate,
+                  endDate,
+                );
+              },
+              icon: const Icon(Icons.check, color: Colors.white, size: 18),
+              label: const Text('Appliquer', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLossDialog(BuildContext context, StockAlert alert) {
+    final quantityController = TextEditingController(text: '${alert.currentStock}');
+    String selectedReason = 'Produit expiré';
+    final notesController = TextEditingController();
+    
+    final reasons = [
+      'Produit expiré',
+      'Produit endommagé',
+      'Erreur d\'inventaire',
+      'Vol/Perte',
+      'Rappel fournisseur',
+      'Autre',
+    ];
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.delete_outline, color: Colors.red),
+              const SizedBox(width: 8),
+              const Text('Retirer du stock'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Product info
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.medication, color: Colors.grey.shade600),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              alert.productName,
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              'Stock actuel: ${alert.currentStock}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Quantity
+                const Text(
+                  'Quantité à retirer',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: quantityController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    suffixText: 'unités',
+                    hintText: 'Quantité',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Reason
+                const Text(
+                  'Raison de la perte',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: reasons.map((reason) {
+                    final isSelected = selectedReason == reason;
+                    return GestureDetector(
+                      onTap: () {
+                        setDialogState(() {
+                          selectedReason = reason;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.red.shade100 : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected ? Colors.red : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Text(
+                          reason,
+                          style: TextStyle(
+                            color: isSelected ? Colors.red.shade800 : Colors.grey.shade700,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                
+                // Notes
+                const Text(
+                  'Notes (optionnel)',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: notesController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    hintText: 'Ajouter des détails...',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                final quantity = int.tryParse(quantityController.text) ?? 0;
+                if (quantity <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Veuillez entrer une quantité valide'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop();
+                // Call the API to mark as loss
+                _markAsLoss(
+                  int.tryParse(alert.productId) ?? 0,
+                  quantity,
+                  selectedReason,
+                  notesController.text.isNotEmpty ? notesController.text : null,
+                );
+              },
+              icon: const Icon(Icons.delete, color: Colors.white, size: 18),
+              label: const Text('Retirer', style: TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _applyPromotion(
+    int productId,
+    double discountPercentage,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    // Show loading
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text('Application de la promotion...'),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    // TODO: Call API via provider
+    // final result = await ref.read(inventoryRepositoryProvider).applyPromotion(
+    //   productId,
+    //   discountPercentage,
+    //   startDate,
+    //   endDate,
+    // );
+
+    // Simulate API call
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 8),
+              Text('Promotion de ${discountPercentage.toInt()}% appliquée'),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _markAsLoss(
+    int productId,
+    int quantity,
+    String reason,
+    String? notes,
+  ) async {
+    // Show loading
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text('Mise à jour du stock...'),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    // TODO: Call API via provider
+    // final result = await ref.read(inventoryRepositoryProvider).markAsLoss(
+    //   productId,
+    //   quantity,
+    //   reason,
+    //   notes: notes,
+    // );
+
+    // Simulate API call
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 8),
+              Text('$quantity unité(s) retirée(s) du stock'),
+            ],
+          ),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Remove the alert from the list
+      setState(() {
+        _alerts.removeWhere((a) => a.productId == productId.toString());
+      });
+    }
   }
 }
 

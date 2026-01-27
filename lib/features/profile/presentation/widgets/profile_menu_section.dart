@@ -57,18 +57,6 @@ class ProfileMenuSection extends StatelessWidget {
                 const Divider(height: 1),
                 _buildMenuItem(
                   context,
-                  icon: Icons.language_outlined,
-                  iconColor: Colors.purple,
-                  title: 'Langue',
-                  subtitle: 'Français',
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    _showLanguageSelector(context);
-                  },
-                ),
-                const Divider(height: 1),
-                _buildMenuItem(
-                  context,
                   icon: Icons.help_outline,
                   iconColor: Theme.of(context).colorScheme.primary,
                   title: 'Aide & Support',
@@ -197,96 +185,6 @@ class ProfileMenuSection extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  void _showLanguageSelector(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text(
-                'Choisir la langue',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ),
-            _buildLanguageOption(context, 'Français', 'fr', true),
-            _buildLanguageOption(context, 'English', 'en', false),
-            _buildLanguageOption(context, 'العربية', 'ar', false),
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageOption(BuildContext context, String language, String code, bool isSelected) {
-    return ListTile(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        Navigator.pop(context);
-        if (!isSelected) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('La langue sera disponible prochainement'),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          );
-        }
-      },
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
-              : Colors.grey.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          code.toUpperCase(),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isSelected 
-                ? Theme.of(context).colorScheme.primary
-                : Colors.grey,
-          ),
-        ),
-      ),
-      title: Text(
-        language,
-        style: TextStyle(
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected 
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurface,
-        ),
-      ),
-      trailing: isSelected 
-          ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
-          : null,
     );
   }
 }

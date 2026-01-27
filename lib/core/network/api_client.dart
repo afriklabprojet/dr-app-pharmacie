@@ -213,13 +213,20 @@ class ApiClient {
     final path = error.requestOptions.path;
     final method = error.requestOptions.method;
     final statusCode = error.response?.statusCode;
+    final data = error.response?.data;
+    
+    // Safely extract message from response
+    String? serverMessage;
+    if (data is Map) {
+      serverMessage = data['message']?.toString();
+    }
     
     debugPrint('═══════════════════════════════════════════════════════════');
     if (statusCode == 404) {
       debugPrint('❌ [API ERROR 404] Endpoint non trouvé');
       debugPrint('   URL complète: $baseUrl$path');
       debugPrint('   Méthode: $method');
-      debugPrint('   Message serveur: ${error.response?.data?['message'] ?? 'Non disponible'}');
+      debugPrint('   Message serveur: ${serverMessage ?? 'Non disponible'}');
       debugPrint('   Conseil: Vérifiez que la route existe dans api.php');
     } else if (statusCode == 401) {
       debugPrint('🔐 [API ERROR 401] Non authentifié');
@@ -228,7 +235,7 @@ class ApiClient {
     } else if (statusCode == 500) {
       debugPrint('🔥 [API ERROR 500] Erreur serveur interne');
       debugPrint('   URL: $path');
-      debugPrint('   Message: ${error.response?.data?['message'] ?? 'N/A'}');
+      debugPrint('   Message: ${serverMessage ?? 'N/A'}');
     } else if (error.type == DioExceptionType.connectionError) {
       debugPrint('🌐 [API ERROR] Impossible de se connecter');
       debugPrint('   URL tentée: $baseUrl');

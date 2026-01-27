@@ -186,4 +186,51 @@ class InventoryRepositoryImpl implements InventoryRepository {
     }
     return const Left(NetworkFailure('No internet connection'));
   }
+
+  @override
+  Future<Either<Failure, void>> applyPromotion(
+    int productId,
+    double discountPercentage, {
+    DateTime? endDate,
+  }) async {
+    if (await networkInfo.isConnected) {
+      try {
+        await remoteDataSource.applyPromotion(productId, discountPercentage, endDate: endDate);
+        return const Right(null);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    }
+    return const Left(NetworkFailure('No internet connection'));
+  }
+
+  @override
+  Future<Either<Failure, void>> removePromotion(int productId) async {
+    if (await networkInfo.isConnected) {
+      try {
+        await remoteDataSource.removePromotion(productId);
+        return const Right(null);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    }
+    return const Left(NetworkFailure('No internet connection'));
+  }
+
+  @override
+  Future<Either<Failure, void>> markAsLoss(
+    int productId,
+    int quantity,
+    String reason,
+  ) async {
+    if (await networkInfo.isConnected) {
+      try {
+        await remoteDataSource.markAsLoss(productId, quantity, reason);
+        return const Right(null);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    }
+    return const Left(NetworkFailure('No internet connection'));
+  }
 }
