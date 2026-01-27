@@ -1809,7 +1809,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
 
   // ===== MOBILE MONEY =====
   void _showMobileMoneySheet(BuildContext context) {
-    String selectedOperator = 'Orange Money';
+    String selectedOperator = 'Wave';
     final phoneController = TextEditingController();
     final nameController = TextEditingController();
     bool isLoading = false;
@@ -1867,8 +1867,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                 // Operateurs
                 const Text('Choisir l\'operateur', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E3A5F))),
                 const SizedBox(height: 12),
+                // Ligne 1: Wave, Orange, MTN
                 Row(
                   children: [
+                    _buildOperatorChip('Wave', 'wave', selectedOperator == 'Wave', () {
+                      setModalState(() => selectedOperator = 'Wave');
+                    }),
+                    const SizedBox(width: 8),
                     _buildOperatorChip('Orange Money', 'orange', selectedOperator == 'Orange Money', () {
                       setModalState(() => selectedOperator = 'Orange Money');
                     }),
@@ -1876,10 +1881,19 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                     _buildOperatorChip('MTN MoMo', 'mtn', selectedOperator == 'MTN MoMo', () {
                       setModalState(() => selectedOperator = 'MTN MoMo');
                     }),
-                    const SizedBox(width: 8),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Ligne 2: Moov
+                Row(
+                  children: [
                     _buildOperatorChip('Moov Money', 'moov', selectedOperator == 'Moov Money', () {
                       setModalState(() => selectedOperator = 'Moov Money');
                     }),
+                    const SizedBox(width: 8),
+                    const Expanded(child: SizedBox()),
+                    const SizedBox(width: 8),
+                    const Expanded(child: SizedBox()),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -2011,6 +2025,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
   Widget _buildOperatorChip(String name, String code, bool isSelected, VoidCallback onTap) {
     Color color;
     switch (code) {
+      case 'wave':
+        color = const Color(0xFF1BA8F0); // Bleu Wave
+        break;
       case 'orange':
         color = Colors.orange;
         break;
