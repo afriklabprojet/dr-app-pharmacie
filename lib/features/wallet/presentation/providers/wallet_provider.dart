@@ -149,7 +149,7 @@ class WalletActionsNotifier extends StateNotifier<AsyncValue<void>> {
   }
 }
 
-final walletActionsProvider = StateNotifierProvider.autoDispose<WalletActionsNotifier, AsyncValue<void>>((ref) {
+final walletActionsProvider = StateNotifierProvider<WalletActionsNotifier, AsyncValue<void>>((ref) {
   return WalletActionsNotifier(
     ref.watch(walletRepositoryProvider),
     ref,
