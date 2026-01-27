@@ -722,6 +722,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
     final amountController = TextEditingController();
     String selectedMethod = 'mobile_money';
     bool isLoading = false;
+    String? errorMessage;
     final wallet = ref.read(walletProvider).value;
 
     showModalBottomSheet(
@@ -748,6 +749,35 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                     decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
+                
+                // Message d'erreur visible
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            errorMessage!,
+                            style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => setModalState(() => errorMessage = null),
+                          child: Icon(Icons.close, color: Colors.red.shade400, size: 18),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 const Text(
                   'Demande de retrait',
@@ -829,30 +859,19 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                     onPressed: isLoading ? null : () async {
                       final amount = double.tryParse(amountController.text);
                       if (amount == null || amount <= 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Veuillez entrer un montant valide'),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
+                        setModalState(() => errorMessage = 'Veuillez entrer un montant valide');
                         return;
                       }
                       
                       if (wallet != null && amount > wallet.balance) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Solde insuffisant'),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
+                        setModalState(() => errorMessage = 'Solde insuffisant pour ce retrait (${NumberFormat.currency(locale: 'fr_FR', symbol: 'FCFA', decimalDigits: 0).format(wallet.balance)} disponible)');
                         return;
                       }
                       
-                      setModalState(() => isLoading = true);
+                      setModalState(() {
+                        isLoading = true;
+                        errorMessage = null;
+                      });
                       
                       try {
                         final response = await ref.read(walletActionsProvider.notifier).requestWithdrawal(
@@ -861,7 +880,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                         );
                         
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        ScaffoldMessenger.of(this.context).showSnackBar(
                           SnackBar(
                             content: Row(
                               children: [
@@ -876,15 +895,10 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                           ),
                         );
                       } catch (e) {
-                        setModalState(() => isLoading = false);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Erreur: $e'),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
+                        setModalState(() {
+                          isLoading = false;
+                          errorMessage = 'Erreur: $e';
+                        });
                       }
                     },
                     style: ElevatedButton.styleFrom(
