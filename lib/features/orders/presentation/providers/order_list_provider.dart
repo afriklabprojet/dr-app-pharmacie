@@ -57,6 +57,14 @@ class OrderListNotifier extends StateNotifier<OrderListState> {
     );
   }
 
+  Future<void> rejectOrder(int orderId, {String? reason}) async {
+    final result = await _repository.rejectOrder(orderId, reason: reason);
+    result.fold(
+      (failure) => throw Exception(failure.message),
+      (_) => fetchOrders(),
+    );
+  }
+
   Future<void> updateOrderStatus(int orderId, String status) async {
       // General purpose update if repository supports it, 
       // or map string status to specific methods
@@ -64,6 +72,8 @@ class OrderListNotifier extends StateNotifier<OrderListState> {
           await markOrderReady(orderId);
       } else if (status == 'confirmed') {
           await confirmOrder(orderId);
+      } else if (status == 'rejected') {
+          await rejectOrder(orderId);
       } else {
         // Fallback or other status not implemented on repo yet
         // For now, reload orders to reflect changes made elsewhere

@@ -5,6 +5,13 @@ import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
+import '../../features/profile/presentation/pages/security_settings_page.dart';
+import '../../features/profile/presentation/pages/appearance_settings_page.dart';
+import '../../features/profile/presentation/pages/notification_settings_page.dart';
+import '../../features/profile/presentation/pages/help_support_page.dart';
+import '../../features/profile/presentation/pages/legal_page.dart';
+import '../../features/reports/presentation/pages/reports_dashboard_page.dart';
+import '../../features/inventory/presentation/pages/enhanced_scanner_page.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/providers/state/auth_state.dart';
 import '../presentation/pages/splash_page.dart';
@@ -64,6 +71,38 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsPage(),
+      ),
+      GoRoute(
+        path: '/security-settings',
+        builder: (context, state) => const SecuritySettingsPage(),
+      ),
+      GoRoute(
+        path: '/appearance-settings',
+        builder: (context, state) => const AppearanceSettingsPage(),
+      ),
+      GoRoute(
+        path: '/notification-settings',
+        builder: (context, state) => const NotificationSettingsPage(),
+      ),
+      GoRoute(
+        path: '/help-support',
+        builder: (context, state) => const HelpSupportPage(),
+      ),
+      GoRoute(
+        path: '/terms',
+        builder: (context, state) => const LegalPage(type: 'terms'),
+      ),
+      GoRoute(
+        path: '/privacy',
+        builder: (context, state) => const LegalPage(type: 'privacy'),
+      ),
+      GoRoute(
+        path: '/reports',
+        builder: (context, state) => const ReportsDashboardPage(),
+      ),
+      GoRoute(
+        path: '/scanner',
+        builder: (context, state) => const EnhancedScannerPage(),
       ),
     ],
   );

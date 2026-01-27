@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_colors.dart';
+
 import '../../data/models/on_call_model.dart';
 import '../providers/on_call_provider.dart';
 
@@ -673,7 +673,7 @@ class _AddOnCallSheetState extends ConsumerState<AddOnCallSheet> {
               child: ElevatedButton(
                 onPressed: _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shadowColor: Colors.transparent,
@@ -727,16 +727,16 @@ class _AddOnCallSheetState extends ConsumerState<AddOnCallSheet> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: isPrimary ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade50,
+            color: isPrimary ? Theme.of(context).colorScheme.primary.withOpacity(0.1) : Colors.grey.shade50,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isPrimary ? AppColors.primary.withOpacity(0.3) : Colors.grey.shade200
+              color: isPrimary ? Theme.of(context).colorScheme.primary.withOpacity(0.3) : Colors.grey.shade200
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: isPrimary ? AppColors.primary : Colors.grey.shade700,
+              color: isPrimary ? Theme.of(context).colorScheme.primary : Colors.grey.shade700,
               fontWeight: isPrimary ? FontWeight.w600 : FontWeight.w500,
               fontSize: 13,
             ),
@@ -778,7 +778,7 @@ class _AddOnCallSheetState extends ConsumerState<AddOnCallSheet> {
             ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.primary),
+                Icon(Icons.calendar_today_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -803,7 +803,7 @@ class _AddOnCallSheetState extends ConsumerState<AddOnCallSheet> {
             ),
             child: Row(
               children: [
-                Icon(Icons.access_time_rounded, size: 18, color: AppColors.primary),
+                Icon(Icons.access_time_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

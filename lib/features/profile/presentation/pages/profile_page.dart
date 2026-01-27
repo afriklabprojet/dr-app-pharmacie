@@ -10,7 +10,7 @@ import '../../../auth/presentation/pages/login_page.dart';
 import '../../../on_call/presentation/pages/on_call_page.dart';
 import 'edit_pharmacy_page.dart';
 import 'edit_profile_page.dart';
-import '../../../../core/theme/app_colors.dart';
+
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -19,6 +19,7 @@ class ProfilePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     if (user == null) {
       return const Scaffold(
@@ -28,92 +29,182 @@ class ProfilePage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        centerTitle: false,
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        title: const Text(
-          'Mon Profil',
-          style: TextStyle(
-            fontSize: 20, // Slightly reduced
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Consumer(
-              builder: (context, ref, child) {
-                final unreadCount = ref.watch(unreadNotificationCountProvider);
-                return Badge(
-                  isLabelVisible: unreadCount > 0,
-                  label: Text(unreadCount.toString()),
-                  child: const Icon(Icons.notifications_outlined, color: Colors.black87),
-                );
-              },
-            ),
-            onPressed: () => context.push('/notifications'),
-          ),
-          const SizedBox(width: 8), // Consistent spacing
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black87),
-            onPressed: () => _confirmLogout(context, ref),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Profile Header centered
-            Center(child: _buildProfileHeader(user)),
-            
-            const SizedBox(height: 24),
-
-            // Infos Contact
-            _buildSectionTitle('Coordonnées'),
-            const SizedBox(height: 12),
-            _buildInfoSection(context, user),
-
-            const SizedBox(height: 32),
-
-            // Pharmacies
-            if (user.pharmacies.isNotEmpty) ...[
-              _buildSectionTitle('Ma Pharmacie'),
-              const SizedBox(height: 12),
-              _buildPharmacyCard(context, user.pharmacies.first),
-            ] else if (user.role?.toLowerCase() == 'pharmacy') ...[
-              _buildSectionTitle('Ma Pharmacie'),
-              const SizedBox(height: 12),
-              _buildEmptyState(),
-            ],
-
-            const SizedBox(height: 32),
-
-            // Bouton Déconnexion
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => _confirmLogout(context, ref),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red[400],
-                  side: BorderSide(color: Colors.red.withOpacity(0.2), width: 1),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: const Text(
-                  'Se déconnecter',
-                  style: TextStyle(fontWeight: FontWeight.w500),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header amélioré
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        // Icône avec dégradé
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.indigo,
+                                Colors.indigo.shade300,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.indigo.withOpacity(0.3),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.person_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        
+                        // Titre
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Mon Profil',
+                                style: TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black87,
+                                  letterSpacing: -0.5,
+                                  height: 1.2,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Gérez votre compte et préférences',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Actions
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: Consumer(
+                                  builder: (context, ref, child) {
+                                    final unreadCount = ref.watch(unreadNotificationCountProvider);
+                                    return Badge(
+                                      isLabelVisible: unreadCount > 0,
+                                      label: Text(unreadCount.toString()),
+                                      child: const Icon(Icons.notifications_outlined, color: Colors.black87, size: 24),
+                                    );
+                                  },
+                                ),
+                                onPressed: () => context.push('/notifications'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: Icon(Icons.logout_rounded, color: Colors.red.shade400, size: 22),
+                                onPressed: () => _confirmLogout(context, ref),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Profile Header centered
+                    _buildProfileHeader(user),
+                  ],
                 ),
               ),
-            ),
+              
+              // Contenu
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Infos Contact
+                    _buildSectionTitle('Coordonnées'),
+                    const SizedBox(height: 12),
+                    _buildInfoSection(context, user),
 
-            const SizedBox(height: 40),
-          ],
+                    const SizedBox(height: 32),
+
+                    // Pharmacies
+                    if (user.pharmacies.isNotEmpty) ...[
+                      _buildSectionTitle('Ma Pharmacie'),
+                      const SizedBox(height: 12),
+                      _buildPharmacyCard(context, user.pharmacies.first),
+                    ] else if (user.role?.toLowerCase() == 'pharmacy') ...[
+                      _buildSectionTitle('Ma Pharmacie'),
+                      const SizedBox(height: 12),
+                      _buildEmptyState(),
+                    ],
+
+                    const SizedBox(height: 32),
+
+                    // Section Paramètres & Outils
+                    _buildSectionTitle('Paramètres & Outils'),
+                    const SizedBox(height: 12),
+                    _buildSettingsSection(context),
+
+                    const SizedBox(height: 32),
+
+                    // Bouton Déconnexion
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => _confirmLogout(context, ref),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red[400],
+                          side: BorderSide(color: Colors.red.withOpacity(0.2), width: 1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text(
+                          'Se déconnecter',
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -182,6 +273,143 @@ class ProfilePage extends ConsumerWidget {
           ),
         ),
       );
+  }
+
+  Widget _buildSettingsSection(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildSettingsTile(
+            context,
+            icon: Icons.analytics_outlined,
+            iconColor: Colors.blue,
+            title: 'Rapports & Analytics',
+            subtitle: 'Statistiques de vente et performance',
+            onTap: () => context.push('/reports'),
+          ),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100, indent: 60),
+          _buildSettingsTile(
+            context,
+            icon: Icons.palette_outlined,
+            iconColor: Colors.purple,
+            title: 'Apparence',
+            subtitle: 'Thème, couleurs et mode sombre',
+            onTap: () => context.push('/appearance-settings'),
+          ),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100, indent: 60),
+          _buildSettingsTile(
+            context,
+            icon: Icons.security_outlined,
+            iconColor: Colors.orange,
+            title: 'Sécurité',
+            subtitle: 'Mot de passe et connexion',
+            onTap: () => context.push('/security-settings'),
+          ),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100, indent: 60),
+          _buildSettingsTile(
+            context,
+            icon: Icons.notifications_outlined,
+            iconColor: Colors.teal,
+            title: 'Notifications',
+            subtitle: 'Gérer vos alertes et préférences',
+            onTap: () => context.push('/notification-settings'),
+          ),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100, indent: 60),
+          _buildSettingsTile(
+            context,
+            icon: Icons.help_outline,
+            iconColor: Colors.indigo,
+            title: 'Aide & Support',
+            subtitle: 'FAQ, contact et ressources',
+            onTap: () => context.push('/help-support'),
+          ),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100, indent: 60),
+          _buildSettingsTile(
+            context,
+            icon: Icons.description_outlined,
+            iconColor: Colors.blueGrey,
+            title: 'Conditions d\'utilisation',
+            subtitle: 'CGU et mentions légales',
+            onTap: () => context.push('/terms'),
+          ),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100, indent: 60),
+          _buildSettingsTile(
+            context,
+            icon: Icons.privacy_tip_outlined,
+            iconColor: Colors.cyan,
+            title: 'Politique de confidentialité',
+            subtitle: 'Protection de vos données',
+            onTap: () => context.push('/privacy'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsTile(
+    BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: iconColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 22, color: iconColor),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: Colors.grey[400]),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
@@ -596,8 +824,8 @@ class ProfilePage extends ConsumerWidget {
                         icon: const Icon(Icons.edit, size: 16),
                         label: const Text('Modifier', style: TextStyle(fontSize: 13)),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          side: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           padding: EdgeInsets.zero,
                         ),
@@ -618,7 +846,7 @@ class ProfilePage extends ConsumerWidget {
                         icon: const Icon(Icons.access_time, size: 16),
                         label: const Text('Gardes', style: TextStyle(fontSize: 13)),
                         style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           padding: EdgeInsets.zero,
                         ),

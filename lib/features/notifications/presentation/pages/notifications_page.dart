@@ -44,58 +44,116 @@ class NotificationsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(notificationsProvider);
-    final primaryColor = Theme.of(context).primaryColor;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA), // Fond soft gris clair
       body: SafeArea(
         child: Column(
           children: [
-             // En-tête personnalisé
+             // En-tête amélioré
             Container(
               decoration: const BoxDecoration(
-                color: Color(0xFFF4F8F4), // Vert très léger et apaisant
-                border: Border(
-                  bottom: BorderSide(color: Color(0xFFE8F5E9), width: 1),
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Colors.black87),
-                        onPressed: () => context.pop(),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(40, 40),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Notifications',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                          letterSpacing: -0.5,
-                          fontSize: 22,
-                        ),
-                      ),
-                    ],
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 4,
+                    offset: Offset(0, 2),
                   ),
-                  if (state.notifications.isNotEmpty)
-                    IconButton(
-                      icon: Icon(Icons.done_all_rounded, color: primaryColor),
-                      tooltip: 'Tout marquer comme lu',
-                      onPressed: () {
-                        ref.read(notificationsProvider.notifier).markAllAsRead();
-                      },
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Row(
+                children: [
+                  // Bouton retour
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Colors.black87),
+                      onPressed: () => context.pop(),
                       style: IconButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        padding: const EdgeInsets.all(8),
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(44, 44),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  
+                  // Icône et titre
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.amber.shade600,
+                          Colors.orange.shade400,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.notifications_active_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  
+                  // Texte
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Notifications',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black87,
+                            letterSpacing: -0.5,
+                            fontSize: 22,
+                          ),
+                        ),
+                        Text(
+                          '${state.notifications.where((n) => !n.isRead).length} non lues',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Bouton marquer tout comme lu
+                  if (state.notifications.isNotEmpty)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.done_all_rounded, color: primaryColor),
+                        tooltip: 'Tout marquer comme lu',
+                        onPressed: () {
+                          ref.read(notificationsProvider.notifier).markAllAsRead();
+                        },
+                        style: IconButton.styleFrom(
+                          padding: const EdgeInsets.all(8),
+                        ),
                       ),
                     ),
                 ],

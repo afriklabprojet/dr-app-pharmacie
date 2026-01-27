@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_colors.dart';
+
 import '../providers/inventory_provider.dart';
 
 class CategoriesManagementSheet extends ConsumerStatefulWidget {
@@ -51,7 +51,7 @@ class _CategoriesManagementSheetState extends ConsumerState<CategoriesManagement
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Catégorie ajoutée avec succès"),
-            backgroundColor: AppColors.success,
+            backgroundColor: Colors.green,
           ),
         );
       }
@@ -60,7 +60,7 @@ class _CategoriesManagementSheetState extends ConsumerState<CategoriesManagement
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Erreur: $e"),
-            backgroundColor: AppColors.error,
+            backgroundColor: Colors.red,
           ),
         );
         setState(() => _isLoading = false);
@@ -165,7 +165,7 @@ class _CategoriesManagementSheetState extends ConsumerState<CategoriesManagement
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _submit,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
+                                backgroundColor: Theme.of(context).colorScheme.primary,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
@@ -206,6 +206,7 @@ class _CategoriesManagementSheetState extends ConsumerState<CategoriesManagement
                       separatorBuilder: (c, i) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final cat = categories[index];
+                        final primaryColor = Theme.of(context).colorScheme.primary;
                         return Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -214,11 +215,11 @@ class _CategoriesManagementSheetState extends ConsumerState<CategoriesManagement
                           ),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: AppColors.primary.withOpacity(0.1),
+                              backgroundColor: primaryColor.withOpacity(0.1),
                               child: Text(
                                 cat.name.substring(0, 1).toUpperCase(),
-                                style: const TextStyle(
-                                  color: AppColors.primary,
+                                style: TextStyle(
+                                  color: primaryColor,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -251,7 +252,7 @@ class _CategoriesManagementSheetState extends ConsumerState<CategoriesManagement
                   icon: const Icon(Icons.add),
                   label: const Text('Ajouter une catégorie'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(

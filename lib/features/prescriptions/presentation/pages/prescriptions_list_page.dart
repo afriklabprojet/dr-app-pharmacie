@@ -15,6 +15,7 @@ class PrescriptionsListPage extends ConsumerWidget {
     final state = ref.watch(prescriptionListProvider);
     final notifier = ref.read(prescriptionListProvider.notifier);
     final filtered = notifier.filteredPrescriptions;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -27,21 +28,69 @@ class PrescriptionsListPage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   // Header personnalisé
+                   // Header amélioré avec icône
                    Padding(
-                     padding: const EdgeInsets.symmetric(horizontal: 20),
+                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                      child: Row(
-                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                        children: [
-                         Text(
-                           'Mes Ordonnances',
-                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                             fontWeight: FontWeight.w800,
-                             color: Colors.black87,
-                             letterSpacing: -0.5,
-                             fontSize: 28,
+                         // Icône avec fond dégradé
+                         Container(
+                           padding: const EdgeInsets.all(14),
+                           decoration: BoxDecoration(
+                             gradient: LinearGradient(
+                               colors: [
+                                 Colors.purple.shade600,
+                                 Colors.purple.shade300,
+                               ],
+                               begin: Alignment.topLeft,
+                               end: Alignment.bottomRight,
+                             ),
+                             borderRadius: BorderRadius.circular(16),
+                             boxShadow: [
+                               BoxShadow(
+                                 color: Colors.purple.withOpacity(0.3),
+                                 blurRadius: 12,
+                                 offset: const Offset(0, 4),
+                               ),
+                             ],
+                           ),
+                           child: const Icon(
+                             Icons.medical_services_rounded,
+                             color: Colors.white,
+                             size: 26,
                            ),
                          ),
+                         const SizedBox(width: 16),
+                         
+                         // Titre et sous-titre
+                         Expanded(
+                           child: Column(
+                             crossAxisAlignment: CrossAxisAlignment.start,
+                             children: [
+                               const Text(
+                                 'Mes Ordonnances',
+                                 style: TextStyle(
+                                   fontSize: 26,
+                                   fontWeight: FontWeight.w800,
+                                   color: Colors.black87,
+                                   letterSpacing: -0.5,
+                                   height: 1.2,
+                                 ),
+                               ),
+                               const SizedBox(height: 4),
+                               Text(
+                                 'Demandes de médicaments sur ordonnance',
+                                 style: TextStyle(
+                                   fontSize: 13,
+                                   fontWeight: FontWeight.w500,
+                                   color: Colors.grey.shade600,
+                                 ),
+                               ),
+                             ],
+                           ),
+                         ),
+                         
+                         // Notification
                          Container(
                            decoration: BoxDecoration(
                              color: Colors.grey[50],
@@ -66,7 +115,7 @@ class PrescriptionsListPage extends ConsumerWidget {
                        ],
                      ),
                    ),
-                   const SizedBox(height: 24),
+                   const SizedBox(height: 20),
                    // Filtres défilants
                    SingleChildScrollView(
                      scrollDirection: Axis.horizontal,

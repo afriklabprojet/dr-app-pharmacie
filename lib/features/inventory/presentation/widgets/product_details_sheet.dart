@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/theme/app_colors.dart';
+
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/presentation/widgets/ui_components.dart';
 import '../../domain/entities/product_entity.dart';
@@ -70,14 +70,14 @@ class ProductDetailsSheet extends ConsumerWidget {
                     ),
                     Text(
                       NumberFormat.currency(locale: 'fr_FR', symbol: 'FCFA', decimalDigits: 0).format(product.price),
-                      style: AppTextStyles.h3.copyWith(color: AppColors.primary),
+                      style: AppTextStyles.h3.copyWith(color: Theme.of(context).colorScheme.primary),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
                   product.category, 
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.bodyMedium.copyWith(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600),
                 ),
                 const SizedBox(height: 16),
                 
@@ -88,7 +88,7 @@ class ProductDetailsSheet extends ConsumerWidget {
                   children: [
                     _buildBadge(
                       label: product.stockQuantity > 0 ? "En stock: ${product.stockQuantity}" : "Rupture",
-                      color: product.stockQuantity > 0 ? AppColors.success : AppColors.error,
+                      color: product.stockQuantity > 0 ? Colors.green : Colors.red,
                       isOutline: true,
                     ),
                     if (product.requiresPrescription)
@@ -117,10 +117,10 @@ class ProductDetailsSheet extends ConsumerWidget {
                           // DELETE
                           _showDeleteConfirmation(context, ref);
                         },
-                        icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                        label: const Text("Supprimer", style: TextStyle(color: AppColors.error)),
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        label: const Text("Supprimer", style: TextStyle(color: Colors.red)),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppColors.error),
+                          side: const BorderSide(color: Colors.red),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
@@ -141,7 +141,7 @@ class ProductDetailsSheet extends ConsumerWidget {
                         label: const Text("Modifier"),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           foregroundColor: Colors.white,
                         ),
                       ),

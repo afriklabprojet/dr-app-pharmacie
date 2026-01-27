@@ -3,7 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_colors.dart';
+
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/presentation/widgets/ui_components.dart';
 import '../providers/inventory_provider.dart';
@@ -159,7 +159,7 @@ class _AddProductSheetState extends ConsumerState<AddProductSheet> {
          if (mounted) {
             context.pop(); 
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: const Text("Produit modifié avec succès"), backgroundColor: AppColors.success),
+              SnackBar(content: const Text("Produit modifié avec succès"), backgroundColor: Colors.green),
             );
          }
       } else {
@@ -177,14 +177,14 @@ class _AddProductSheetState extends ConsumerState<AddProductSheet> {
         if (mounted) {
           context.pop(); 
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text("Produit ajouté avec succès"), backgroundColor: AppColors.success),
+            SnackBar(content: const Text("Produit ajouté avec succès"), backgroundColor: Colors.green),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur: $e"), backgroundColor: AppColors.error),
+          SnackBar(content: Text("Erreur: $e"), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -256,7 +256,7 @@ class _AddProductSheetState extends ConsumerState<AddProductSheet> {
                         decoration: BoxDecoration(
                           color: Colors.grey[100],
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
                           image: _imageBytes != null
                               ? DecorationImage(
                                   image: MemoryImage(_imageBytes!),
@@ -270,7 +270,7 @@ class _AddProductSheetState extends ConsumerState<AddProductSheet> {
                                   : null),
                         ),
                         child: (_imageBytes == null && widget.productToEdit?.imageUrl == null)
-                            ? Icon(Icons.add_a_photo_rounded, color: AppColors.textSecondary, size: 32)
+                            ? Icon(Icons.add_a_photo_rounded, color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600, size: 32)
                             : null,
                       ),
                     ),
@@ -287,7 +287,7 @@ class _AddProductSheetState extends ConsumerState<AddProductSheet> {
                       controller: _barcodeController,
                       decoration: InputDecoration(
                         labelText: 'Code Barre (Optionnel)',
-                        prefixIcon: Icon(Icons.qr_code_rounded, color: AppColors.textSecondary),
+                        prefixIcon: Icon(Icons.qr_code_rounded, color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -309,7 +309,7 @@ class _AddProductSheetState extends ConsumerState<AddProductSheet> {
                       value: _categoryController.text.isNotEmpty ? _categoryController.text : null,
                       decoration: InputDecoration(
                         labelText: 'Catégorie *',
-                        prefixIcon: Icon(Icons.category_outlined, color: AppColors.textSecondary),
+                        prefixIcon: Icon(Icons.category_outlined, color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600),
                       ),
                       items: categories.map((cat) {
                         return DropdownMenuItem(
@@ -360,16 +360,16 @@ class _AddProductSheetState extends ConsumerState<AddProductSheet> {
                     // Toggle Ordonnance
                     Container(
                       decoration: BoxDecoration(
-                        color: AppColors.background,
+                        color: Theme.of(context).scaffoldBackgroundColor,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
                       ),
                       child: SwitchListTile(
                         value: _requiresPrescription,
                         onChanged: (val) => setState(() => _requiresPrescription = val),
                         title: Text("Ordonnance Requise", style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
                         subtitle: Text("Cochez si le produit nécessite une ordonnance", style: AppTextStyles.bodySmall),
-                        activeColor: AppColors.primary,
+                        activeColor: Theme.of(context).colorScheme.primary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                     ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/presentation/widgets/voice_search_widget.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/product_entity.dart';
@@ -10,7 +11,9 @@ import '../providers/state/inventory_state.dart';
 import '../widgets/add_product_sheet.dart'; 
 import '../widgets/categories_management_sheet.dart';
 import '../widgets/product_details_sheet.dart';
+import '../widgets/stock_alerts_widget.dart';
 import 'scanner_page.dart';
+import 'enhanced_scanner_page.dart';
 
 class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
@@ -26,7 +29,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     try {
       final String? res = await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => const ScannerPage(),
+          builder: (context) => const EnhancedScannerPage(),
         ),
       );
 
@@ -58,10 +61,28 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     }
   }
 
-  // ... (Garder _showUpdateStockDialog pour l'instant car c'est une petite popup)
-
-  // ... (Supprimer l'ancienne méthode _showAddProductDialog qui n'est plus utilisée)
-
+  /// Démarre la recherche vocale
+  Future<void> _startVoiceSearch() async {
+    final result = await VoiceSearchModal.show(
+      context,
+      hintText: 'Recherche vocale',
+    );
+    
+    if (result != null && result.isNotEmpty && mounted) {
+      _searchController.text = result;
+      ref.read(inventoryProvider.notifier).search(result);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Recherche: "$result"'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -110,11 +131,94 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     );
   }
 
+  void _showStockAlerts() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Title
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Alertes de Stock',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Produits nécessitant votre attention',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Content
+              const Expanded(
+                child: StockAlertsWidget(
+                  showHeader: false,
+                  maxAlerts: 20,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(inventoryProvider);
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     // Filter products based on search query
     final filteredProducts = state.products.where((product) {
@@ -134,70 +238,101 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // En-tête personnalisé
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Consumer(
-                            builder: (context, ref, child) {
-                              final authState = ref.watch(authProvider);
-                              final pharmacyName = authState.user?.pharmacies.isNotEmpty == true 
-                                  ? authState.user!.pharmacies.first.name 
-                                  : '';
-                              
-                              return Column(
+                  // En-tête amélioré
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final authState = ref.watch(authProvider);
+                      final pharmacyName = authState.user?.pharmacies.isNotEmpty == true 
+                          ? authState.user!.pharmacies.first.name 
+                          : null;
+                      
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        child: Row(
+                          children: [
+                            // Icône avec fond dégradé
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.teal,
+                                    Colors.teal.shade300,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.teal.withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.inventory_2_rounded,
+                                color: Colors.white,
+                                size: 26,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            
+                            // Titre et sous-titre
+                            Expanded(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
+                                  const Text(
                                     'Gestion Stock',
-                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                    style: TextStyle(
+                                      fontSize: 26,
                                       fontWeight: FontWeight.w800,
                                       color: Colors.black87,
                                       letterSpacing: -0.5,
-                                      fontSize: 28,
+                                      height: 1.2,
                                     ),
-                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  if (pharmacyName.isNotEmpty)
-                                    Text(
-                                      pharmacyName,
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    pharmacyName ?? 'Inventaire et produits',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey.shade600,
                                     ),
+                                  ),
                                 ],
-                              );
-                            },
-                          ),
-                        ),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: Consumer(
-                              builder: (context, ref, child) {
-                                final unreadCount = ref.watch(unreadNotificationCountProvider);
-                                return Badge(
-                                  isLabelVisible: unreadCount > 0,
-                                  backgroundColor: Colors.redAccent,
-                                  smallSize: 10,
-                                  label: unreadCount > 0 ? null : null, 
-                                  child: const Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 28),
-                                );
-                              },
+                              ),
                             ),
-                            onPressed: () => context.push('/notifications'),
-                          ),
+                            
+                            // Notification
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: Consumer(
+                                  builder: (context, ref, child) {
+                                    final unreadCount = ref.watch(unreadNotificationCountProvider);
+                                    return Badge(
+                                      isLabelVisible: unreadCount > 0,
+                                      backgroundColor: Colors.redAccent,
+                                      smallSize: 10,
+                                      label: unreadCount > 0 ? null : null, 
+                                      child: const Icon(Icons.notifications_none_rounded, color: Colors.black87, size: 28),
+                                    );
+                                  },
+                                ),
+                                onPressed: () => context.push('/notifications'),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
                   
@@ -214,12 +349,20 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                             ),
                             child: TextField(
                               controller: _searchController,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 hintText: 'Rechercher un produit...',
-                                hintStyle: TextStyle(color: Colors.grey),
-                                prefixIcon: Icon(Icons.search, color: Colors.grey),
+                                hintStyle: const TextStyle(color: Colors.grey),
+                                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                                suffixIcon: IconButton(
+                                  onPressed: () => _startVoiceSearch(),
+                                  icon: Icon(
+                                    Icons.mic,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                  tooltip: 'Recherche vocale',
+                                ),
                                 border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                               ),
                               onChanged: (value) {
                                 ref.read(inventoryProvider.notifier).search(value);
@@ -273,6 +416,25 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                             },
                             icon: const Icon(Icons.category_outlined, size: 24, color: Color(0xFF1E88E5)), // Hardcoded color to avoid const error with dynamic theme color
                             tooltip: 'Gérer les catégories',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.orange.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              )
+                            ]
+                          ),
+                          child: IconButton(
+                            onPressed: _showStockAlerts,
+                            icon: const Icon(Icons.warning_amber_rounded, size: 24, color: Colors.orange),
+                            tooltip: 'Alertes stock',
                           ),
                         ),
                       ],

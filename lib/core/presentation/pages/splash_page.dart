@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../theme/app_colors.dart';
+
 import '../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../features/auth/presentation/providers/state/auth_state.dart';
 
@@ -141,7 +141,7 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
                           child: Icon(
                             Icons.local_pharmacy_rounded, 
                             size: 60,
-                            color: AppColors.primary,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ),
@@ -195,7 +195,7 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
                     height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.primary),
                     ),
                   ),
                   const SizedBox(height: 24),

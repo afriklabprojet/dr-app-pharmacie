@@ -6,6 +6,7 @@ abstract class OrderRemoteDataSource {
   Future<OrderModel> getOrderDetails(int id);
   Future<void> confirmOrder(int id);
   Future<void> markOrderReady(int id);
+  Future<void> rejectOrder(int id, {String? reason});
   Future<void> addNotes(int id, String notes);
 }
 
@@ -44,6 +45,14 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
   @override
   Future<void> markOrderReady(int id) async {
     await apiClient.post('/pharmacy/orders/$id/ready');
+  }
+
+  @override
+  Future<void> rejectOrder(int id, {String? reason}) async {
+    await apiClient.post(
+      '/pharmacy/orders/$id/reject',
+      data: reason != null ? {'reason': reason} : null,
+    );
   }
 
   @override

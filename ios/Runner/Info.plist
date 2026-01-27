@@ -50,6 +50,8 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Cette application a besoin d'accéder à la caméra pour scanner les codes-barres des produits.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Cette application a besoin d'accéder au microphone pour scanner les codes-barres.</string>
+	<string>Cette application a besoin d'accéder au microphone pour la recherche vocale de produits.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Cette application utilise la reconnaissance vocale pour rechercher des produits par la voix.</string>
 </dict>
 </plist>

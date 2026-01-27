@@ -54,6 +54,7 @@ dependencies:
   flutter_dotenv: ^5.1.0
   flutter_localizations:
     sdk: flutter
+  speech_to_text: ^7.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

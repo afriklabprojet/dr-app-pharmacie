@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart';
-import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
 import 'core/config/routes.dart';
 import 'core/config/env_config.dart';
 import 'core/providers/core_providers.dart';
@@ -68,10 +68,20 @@ class _PharmacyAppState extends ConsumerState<PharmacyApp> {
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
+    final themeState = ref.watch(themeProvider);
+    
+    // Obtenir la couleur d'accent dynamique
+    Color? accentColor;
+    if (themeState.customAccentColor != null) {
+      final colorKey = themeState.customAccentColor!;
+      accentColor = AppThemes.accentColors[colorKey];
+    }
 
     return MaterialApp.router(
       title: 'DR-PHARMA Pharmacie',
-      theme: AppTheme.lightTheme,
+      theme: AppThemes.lightTheme(accentColor: accentColor),
+      darkTheme: AppThemes.darkTheme(accentColor: accentColor),
+      themeMode: themeState.themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
@@ -86,4 +96,3 @@ class _PharmacyAppState extends ConsumerState<PharmacyApp> {
     );
   }
 }
-

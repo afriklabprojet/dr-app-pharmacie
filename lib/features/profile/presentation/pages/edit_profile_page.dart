@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/domain/entities/user_entity.dart';
 import '../providers/profile_provider.dart';
-import '../../../../core/theme/app_colors.dart';
+
 
 class EditProfilePage extends ConsumerStatefulWidget {
   final UserEntity user;
@@ -107,7 +107,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                 child: FilledButton(
                   onPressed: _isLoading ? null : _submit,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading 
@@ -146,7 +146,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
         ),
         filled: true,
         fillColor: Colors.white,

@@ -7,7 +7,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/providers/duty_zones_provider.dart';
 import '../../../auth/data/models/duty_zone_model.dart';
 import '../providers/profile_provider.dart';
-import '../../../../core/theme/app_colors.dart';
+
 
 class EditPharmacyPage extends ConsumerStatefulWidget {
   final PharmacyEntity pharmacy;
@@ -329,7 +329,7 @@ class _EditPharmacyPageState extends ConsumerState<EditPharmacyPage> {
                 child: FilledButton(
                   onPressed: isLoading ? null : _submit,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -395,7 +395,7 @@ class _EditPharmacyPageState extends ConsumerState<EditPharmacyPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
         ),
         filled: true,
         fillColor: Colors.grey[50],

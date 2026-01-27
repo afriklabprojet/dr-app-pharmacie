@@ -99,4 +99,17 @@ class OrderRepositoryImpl implements OrderRepository {
     }
     return const Left(NetworkFailure('No internet connection'));
   }
+
+  @override
+  Future<Either<Failure, void>> rejectOrder(int id, {String? reason}) async {
+    if (await networkInfo.isConnected) {
+      try {
+        await remoteDataSource.rejectOrder(id, reason: reason);
+        return const Right(null);
+      } catch (e) {
+        return Left(ServerFailure(e.toString()));
+      }
+    }
+    return const Left(NetworkFailure('No internet connection'));
+  }
 }

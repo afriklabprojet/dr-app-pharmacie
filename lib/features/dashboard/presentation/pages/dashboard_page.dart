@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/presentation/widgets/connectivity_widgets.dart';
+import '../../../../core/providers/core_providers.dart';
 import '../../../orders/presentation/pages/orders_list_page.dart';
 import '../../../prescriptions/presentation/pages/prescriptions_list_page.dart';
 import '../../../inventory/presentation/pages/inventory_page.dart';
@@ -27,55 +29,168 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _currentIndex, 
-        children: _pages,
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
-            ),
-          ],
+    return ConnectivityBanner(
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: IndexedStack(
+          index: _currentIndex, 
+          children: _pages,
         ),
-        child: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          // Le style est géré globalement par AppTheme.navigationBarTheme
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.shopping_bag_outlined),
-              selectedIcon: Icon(Icons.shopping_bag_rounded),
-              label: 'Commandes',
+        bottomNavigationBar: _buildBottomNav(),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _NavItem(
+                icon: Icons.shopping_bag_outlined,
+                selectedIcon: Icons.shopping_bag_rounded,
+                label: 'Commandes',
+                isSelected: _currentIndex == 0,
+                onTap: () => _selectTab(0),
+              ),
+              _NavItem(
+                icon: Icons.medical_services_outlined,
+                selectedIcon: Icons.medical_services_rounded,
+                label: 'Ordos',
+                isSelected: _currentIndex == 1,
+                onTap: () => _selectTab(1),
+              ),
+              _NavItem(
+                icon: Icons.inventory_2_outlined,
+                selectedIcon: Icons.inventory_2_rounded,
+                label: 'Stock',
+                isSelected: _currentIndex == 2,
+                onTap: () => _selectTab(2),
+              ),
+              _NavItem(
+                icon: Icons.account_balance_wallet_outlined,
+                selectedIcon: Icons.account_balance_wallet_rounded,
+                label: 'Finances',
+                isSelected: _currentIndex == 3,
+                onTap: () => _selectTab(3),
+              ),
+              _NavItem(
+                icon: Icons.person_outline,
+                selectedIcon: Icons.person_rounded,
+                label: 'Profil',
+                isSelected: _currentIndex == 4,
+                onTap: () => _selectTab(4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _selectTab(int index) {
+    if (_currentIndex != index) {
+      HapticFeedback.selectionClick();
+      setState(() => _currentIndex = index);
+    }
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final int? badgeCount;
+
+  const _NavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.badgeCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final primaryLight = primaryColor.withOpacity(0.1);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? primaryLight : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    isSelected ? selectedIcon : icon,
+                    key: ValueKey(isSelected),
+                    color: isSelected ? primaryColor : textSecondary,
+                    size: 24,
+                  ),
+                ),
+                if (badgeCount != null && badgeCount! > 0)
+                  Positioned(
+                    right: -6,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16),
+                      child: Text(
+                        badgeCount! > 99 ? '99+' : badgeCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            NavigationDestination(
-              icon: Icon(Icons.medical_services_outlined),
-              selectedIcon: Icon(Icons.medical_services_rounded),
-              label: 'Ordos',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.inventory_2_outlined),
-              selectedIcon: Icon(Icons.inventory_2_rounded),
-              label: 'Stock',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-              label: 'Finances',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'Profil',
+            const SizedBox(height: 4),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                color: isSelected ? primaryColor : textSecondary,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              ),
+              child: Text(label),
             ),
           ],
         ),

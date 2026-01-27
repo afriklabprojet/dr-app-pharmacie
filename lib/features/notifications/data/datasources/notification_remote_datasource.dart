@@ -27,7 +27,12 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   Future<int> getUnreadCount() async {
     final response = await _client.get('/notifications/unread');
     if (response.data['data'] != null && response.data['data']['unread_count'] != null) {
-      return response.data['data']['unread_count'] as int;
+      final count = response.data['data']['unread_count'];
+      // Handle both int and String from server
+      if (count is int) return count;
+      if (count is String) return int.tryParse(count) ?? 0;
+      if (count is num) return count.toInt();
+      return 0;
     }
     return 0;
   }
