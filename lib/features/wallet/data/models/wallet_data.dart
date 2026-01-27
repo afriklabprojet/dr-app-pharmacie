@@ -51,3 +51,38 @@ class WalletTransaction {
     );
   }
 }
+
+/// Paramètres de seuil de retrait
+class WithdrawalSettings {
+  final double threshold;
+  final bool autoWithdraw;
+  final bool hasPin;
+  final bool hasMobileMoney;
+  final bool hasBankInfo;
+
+  WithdrawalSettings({
+    required this.threshold,
+    required this.autoWithdraw,
+    this.hasPin = false,
+    this.hasMobileMoney = false,
+    this.hasBankInfo = false,
+  });
+
+  factory WithdrawalSettings.fromJson(Map<String, dynamic> json) {
+    return WithdrawalSettings(
+      threshold: (json['threshold'] as num?)?.toDouble() ?? 50000,
+      autoWithdraw: json['auto_withdraw'] ?? false,
+      hasPin: json['has_pin'] ?? false,
+      hasMobileMoney: json['has_mobile_money'] ?? false,
+      hasBankInfo: json['has_bank_info'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'threshold': threshold,
+    'auto_withdraw': autoWithdraw,
+    'has_pin': hasPin,
+    'has_mobile_money': hasMobileMoney,
+    'has_bank_info': hasBankInfo,
+  };
+}

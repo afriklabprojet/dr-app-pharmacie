@@ -89,17 +89,40 @@ class WalletRepository {
     }
   }
 
+  /// Récupérer les paramètres de seuil de retrait
+  Future<WithdrawalSettings> getWithdrawalSettings() async {
+    try {
+      final response = await _dio.get('$_endpoint/threshold');
+      return WithdrawalSettings.fromJson(response.data['data']);
+    } catch (e) {
+      // Retourner les valeurs par défaut en cas d'erreur
+      return WithdrawalSettings(
+        threshold: 50000,
+        autoWithdraw: false,
+        hasPin: false,
+        hasMobileMoney: false,
+        hasBankInfo: false,
+      );
+    }
+  }
+
   /// Configurer le seuil de retrait automatique
-  Future<bool> setWithdrawalThreshold({
+  Future<WithdrawalSettings> setWithdrawalThreshold({
     required double threshold,
     required bool autoWithdraw,
   }) async {
     try {
-      await _dio.post('$_endpoint/threshold', data: {
+      final response = await _dio.post('$_endpoint/threshold', data: {
         'threshold': threshold,
         'auto_withdraw': autoWithdraw,
       });
-      return true;
+      return WithdrawalSettings(
+        threshold: (response.data['data']['threshold'] as num).toDouble(),
+        autoWithdraw: response.data['data']['auto_withdraw'] ?? false,
+        hasPin: false,
+        hasMobileMoney: false,
+        hasBankInfo: false,
+      );
     } catch (e) {
       throw Exception('Failed to set withdrawal threshold: $e');
     }

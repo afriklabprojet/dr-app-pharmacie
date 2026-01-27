@@ -13,6 +13,12 @@ final walletProvider = FutureProvider.autoDispose<WalletData>((ref) async {
   return repository.getWalletData();
 });
 
+/// Provider pour les paramètres de seuil de retrait
+final withdrawalSettingsProvider = FutureProvider<WithdrawalSettings>((ref) async {
+  final repository = ref.watch(walletRepositoryProvider);
+  return repository.getWithdrawalSettings();
+});
+
 /// Provider pour les statistiques par période
 final walletStatsProvider = FutureProvider.autoDispose.family<WalletStats, String>((ref, period) async {
   final repository = ref.watch(walletRepositoryProvider);
@@ -108,8 +114,13 @@ class WalletActionsNotifier extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// Récupérer les paramètres de retrait
+  Future<WithdrawalSettings> getWithdrawalSettings() async {
+    return await _repository.getWithdrawalSettings();
+  }
+
   /// Configurer le seuil de retrait
-  Future<bool> setWithdrawalThreshold({
+  Future<WithdrawalSettings> setWithdrawalThreshold({
     required double threshold,
     required bool autoWithdraw,
   }) async {
@@ -120,10 +131,12 @@ class WalletActionsNotifier extends StateNotifier<AsyncValue<void>> {
         autoWithdraw: autoWithdraw,
       );
       state = const AsyncValue.data(null);
+      // Invalider le cache des paramètres
+      _ref.invalidate(withdrawalSettingsProvider);
       return result;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
-      return false;
+      rethrow;
     }
   }
 

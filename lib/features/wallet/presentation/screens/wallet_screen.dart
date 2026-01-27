@@ -2939,187 +2939,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
 
   // ===== SEUIL DE RETRAIT =====
   void _showWithdrawalThresholdSheet(BuildContext context) {
-    double threshold = 50000;
-    bool autoWithdraw = false;
-    bool isLoading = false;
-    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.teal, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Seuil de retrait', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
-                          Text('Configurez le montant minimum', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                
-                // Affichage du seuil
-                Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        '${NumberFormat('#,###', 'fr_FR').format(threshold)} FCFA',
-                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
-                      ),
-                      const SizedBox(height: 4),
-                      Text('Montant minimum de retrait', style: TextStyle(color: Colors.grey.shade600)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Slider
-                Slider(
-                  value: threshold,
-                  min: 10000,
-                  max: 500000,
-                  divisions: 49,
-                  label: '${NumberFormat('#,###', 'fr_FR').format(threshold)} FCFA',
-                  onChanged: (val) => setModalState(() => threshold = val),
-                  activeColor: Colors.teal,
-                ),
-                
-                // Valeurs rapides
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [10000.0, 50000.0, 100000.0, 200000.0].map((val) {
-                    return TextButton(
-                      onPressed: () => setModalState(() => threshold = val),
-                      child: Text(
-                        '${(val / 1000).toInt()}K',
-                        style: TextStyle(
-                          color: threshold == val ? Colors.teal : Colors.grey,
-                          fontWeight: threshold == val ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                
-                const SizedBox(height: 20),
-                
-                // Auto withdraw toggle
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.autorenew_rounded, color: Colors.teal),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Retrait automatique', style: TextStyle(fontWeight: FontWeight.w600)),
-                            Text('Retirer automatiquement quand le seuil est atteint', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: autoWithdraw,
-                        onChanged: (val) => setModalState(() => autoWithdraw = val),
-                        activeColor: Colors.teal,
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isLoading ? null : () async {
-                      setModalState(() => isLoading = true);
-                      
-                      try {
-                        await ref.read(walletActionsProvider.notifier).setWithdrawalThreshold(
-                          threshold: threshold,
-                          autoWithdraw: autoWithdraw,
-                        );
-                        
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                const Icon(Icons.check_circle, color: Colors.white),
-                                const SizedBox(width: 12),
-                                Text('Seuil de ${NumberFormat('#,###', 'fr_FR').format(threshold)} FCFA enregistre'),
-                              ],
-                            ),
-                            backgroundColor: Colors.green,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
-                      } catch (e) {
-                        setModalState(() => isLoading = false);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Erreur: $e'),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    child: isLoading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-        ),
+      builder: (ctx) => _WithdrawalThresholdContent(
+        ref: ref,
+        parentContext: this.context,
       ),
     );
   }
@@ -3335,6 +3161,331 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
               Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Widget séparé pour le seuil de retrait avec chargement des données
+class _WithdrawalThresholdContent extends ConsumerStatefulWidget {
+  final WidgetRef ref;
+  final BuildContext parentContext;
+
+  const _WithdrawalThresholdContent({
+    required this.ref,
+    required this.parentContext,
+  });
+
+  @override
+  ConsumerState<_WithdrawalThresholdContent> createState() => _WithdrawalThresholdContentState();
+}
+
+class _WithdrawalThresholdContentState extends ConsumerState<_WithdrawalThresholdContent> {
+  double _threshold = 50000;
+  bool _autoWithdraw = false;
+  bool _isLoading = false;
+  bool _isSaving = false;
+  String? _errorMessage;
+  String? _successMessage;
+  bool _hasPin = false;
+  bool _hasMobileMoney = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() => _isLoading = true);
+    try {
+      final settings = await widget.ref.read(walletActionsProvider.notifier).getWithdrawalSettings();
+      if (mounted) {
+        setState(() {
+          _threshold = settings.threshold;
+          _autoWithdraw = settings.autoWithdraw;
+          _hasPin = settings.hasPin;
+          _hasMobileMoney = settings.hasMobileMoney;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Impossible de charger les paramètres';
+        });
+      }
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      await widget.ref.read(walletActionsProvider.notifier).setWithdrawalThreshold(
+        threshold: _threshold,
+        autoWithdraw: _autoWithdraw,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _successMessage = 'Seuil de ${NumberFormat('#,###', 'fr_FR').format(_threshold)} FCFA enregistré';
+        });
+        
+        // Fermer après 1.5 secondes
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          if (mounted && Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _errorMessage = 'Erreur: ${e.toString().replaceAll('Exception: ', '')}';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            
+            // Message d'erreur
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(_errorMessage!, style: TextStyle(color: Colors.red.shade700)),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _errorMessage = null),
+                      child: Icon(Icons.close, color: Colors.red.shade400, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
+            // Message de succès
+            if (_successMessage != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(_successMessage!, style: TextStyle(color: Colors.green.shade700)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.teal, size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Seuil de retrait', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F))),
+                      Text('Montant minimum pour retrait automatique', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            if (_isLoading) ...[
+              const SizedBox(height: 60),
+              const Center(child: CircularProgressIndicator(color: Colors.teal)),
+              const SizedBox(height: 60),
+            ] else ...[
+              const SizedBox(height: 32),
+              
+              // Affichage du seuil
+              Center(
+                child: Column(
+                  children: [
+                    Text(
+                      '${NumberFormat('#,###', 'fr_FR').format(_threshold)} FCFA',
+                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF1E3A5F)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Montant minimum de retrait', style: TextStyle(color: Colors.grey.shade600)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Slider
+              Slider(
+                value: _threshold,
+                min: 10000,
+                max: 500000,
+                divisions: 49,
+                label: '${NumberFormat('#,###', 'fr_FR').format(_threshold)} FCFA',
+                onChanged: (val) => setState(() => _threshold = val),
+                activeColor: Colors.teal,
+              ),
+              
+              // Valeurs rapides
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [10000.0, 50000.0, 100000.0, 200000.0].map((val) {
+                  final isSelected = (_threshold - val).abs() < 1000;
+                  return TextButton(
+                    onPressed: () => setState(() => _threshold = val),
+                    style: TextButton.styleFrom(
+                      backgroundColor: isSelected ? Colors.teal.withOpacity(0.1) : null,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: Text(
+                      '${(val / 1000).toInt()}K',
+                      style: TextStyle(
+                        color: isSelected ? Colors.teal : Colors.grey,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Auto withdraw toggle
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _autoWithdraw ? Colors.teal.withOpacity(0.1) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _autoWithdraw ? Colors.teal : Colors.grey.shade200,
+                    width: _autoWithdraw ? 2 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.autorenew_rounded, color: _autoWithdraw ? Colors.teal : Colors.grey),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Retrait automatique', style: TextStyle(fontWeight: FontWeight.w600)),
+                          Text(
+                            'Retirer automatiquement quand le solde dépasse le seuil',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _autoWithdraw,
+                      onChanged: (val) => setState(() => _autoWithdraw = val),
+                      activeColor: Colors.teal,
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Warning si retrait automatique activé mais pas de mode de paiement
+              if (_autoWithdraw && !_hasMobileMoney) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Configurez d\'abord un compte Mobile Money pour le retrait automatique',
+                          style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _saveSettings,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: _isSaving
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Enregistrer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+          ],
         ),
       ),
     );
