@@ -1814,6 +1814,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
     final nameController = TextEditingController();
     bool isLoading = false;
     bool isPrimary = true;
+    String? errorMessage;
+    String? successMessage;
     
     showModalBottomSheet(
       context: context,
@@ -1839,6 +1841,61 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                     decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
+                
+                // Message d'erreur
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            errorMessage!,
+                            style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => setModalState(() => errorMessage = null),
+                          child: Icon(Icons.close, color: Colors.red.shade400, size: 18),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                // Message de succès
+                if (successMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            successMessage!,
+                            style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
                 const SizedBox(height: 24),
                 Row(
                   children: [
@@ -1955,15 +2012,21 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: isLoading ? null : () async {
+                      // Réinitialiser les messages
+                      setModalState(() {
+                        errorMessage = null;
+                        successMessage = null;
+                      });
+                      
                       if (phoneController.text.isEmpty || nameController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Veuillez remplir tous les champs'),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
+                        setModalState(() => errorMessage = 'Veuillez remplir tous les champs');
+                        return;
+                      }
+                      
+                      // Validation du numéro de téléphone
+                      final phone = phoneController.text.trim();
+                      if (phone.length < 8) {
+                        setModalState(() => errorMessage = 'Numéro de téléphone invalide');
                         return;
                       }
                       
@@ -1972,36 +2035,27 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                       try {
                         await ref.read(walletActionsProvider.notifier).saveMobileMoneyInfo(
                           operator: selectedOperator,
-                          phoneNumber: phoneController.text,
-                          accountName: nameController.text,
+                          phoneNumber: phone,
+                          accountName: nameController.text.trim(),
                           isPrimary: isPrimary,
                         );
                         
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Row(
-                              children: [
-                                Icon(Icons.check_circle, color: Colors.white),
-                                SizedBox(width: 12),
-                                Text('Compte Mobile Money enregistre'),
-                              ],
-                            ),
-                            backgroundColor: Colors.green,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
+                        setModalState(() {
+                          isLoading = false;
+                          successMessage = 'Compte $selectedOperator enregistré avec succès!';
+                        });
+                        
+                        // Fermer après un délai
+                        Future.delayed(const Duration(seconds: 2), () {
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
+                        });
                       } catch (e) {
-                        setModalState(() => isLoading = false);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Erreur: $e'),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
+                        setModalState(() {
+                          isLoading = false;
+                          errorMessage = 'Erreur: ${e.toString().replaceAll('Exception: ', '')}';
+                        });
                       }
                     },
                     style: ElevatedButton.styleFrom(
