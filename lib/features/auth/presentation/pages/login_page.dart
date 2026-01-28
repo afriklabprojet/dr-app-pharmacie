@@ -23,6 +23,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
   late Animation<Offset> _slideAnimation;
 
   bool _isPasswordVisible = false;
+  bool _isRedirecting = false; // Prevent multiple redirections
 
   @override
   void initState() {
@@ -69,6 +70,14 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
 
   void _submit() {
     debugPrint('🔘 [LoginPage] _submit() appelé');
+    
+    // Prevent double-tap / multiple submissions
+    final authState = ref.read(authProvider);
+    if (authState.status == AuthStatus.loading || _isRedirecting) {
+      debugPrint('⚠️ [LoginPage] Submission ignorée - déjà en cours');
+      return;
+    }
+    
     debugPrint('🔘 [LoginPage] Email: ${_emailController.text}');
     debugPrint('🔘 [LoginPage] Form valid: ${_formKey.currentState?.validate()}');
     
@@ -88,19 +97,30 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
       debugPrint('👂 [LoginPage] Auth state changed: ${previous?.status} -> ${next.status}');
       if (next.status == AuthStatus.error && next.errorMessage != null) {
         debugPrint('❌ [LoginPage] Erreur affichée: ${next.errorMessage}');
+        if (_isRedirecting && mounted) {
+          setState(() => _isRedirecting = false);
+        }
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
       }
-      if (next.status == AuthStatus.authenticated) {
+      if (next.status == AuthStatus.authenticated && !_isRedirecting) {
         debugPrint('✅ [LoginPage] Authentifié - redirection vers dashboard');
-        context.go('/dashboard');
+        if (mounted) {
+          setState(() => _isRedirecting = true);
+        }
+        // Small delay to ensure UI shows loading state before navigation
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted) {
+            context.go('/dashboard');
+          }
+        });
       }
     });
 
 
     final authState = ref.watch(authProvider);
-    final isLoading = authState.status == AuthStatus.loading;
+    final isLoading = authState.status == AuthStatus.loading || _isRedirecting;
     
     debugPrint('🖼️ [LoginPage] build() - status: ${authState.status}, isLoading: $isLoading');
 
