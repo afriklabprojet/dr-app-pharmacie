@@ -38,6 +38,17 @@ class UnauthorizedException implements Exception {
   String toString() => 'UnauthorizedException: $message';
 }
 
+/// Exception pour les erreurs 403 (compte non approuvé, suspendu, etc.)
+class ForbiddenException implements Exception {
+  final String message;
+  final String? errorCode;
+
+  ForbiddenException({required this.message, this.errorCode});
+
+  @override
+  String toString() => 'ForbiddenException: $message (code: $errorCode)';
+}
+
 class ValidationException implements Exception {
   final Map<String, List<String>> errors;
 

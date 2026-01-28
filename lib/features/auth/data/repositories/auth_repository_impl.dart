@@ -56,6 +56,9 @@ class AuthRepositoryImpl implements AuthRepository {
       } on UnauthorizedException catch (e) {
         debugPrint('❌ [AuthRepository] UnauthorizedException: ${e.message}');
         return Left(UnauthorizedFailure(e.message));
+      } on ForbiddenException catch (e) {
+        debugPrint('❌ [AuthRepository] ForbiddenException: ${e.message} (code: ${e.errorCode})');
+        return Left(ForbiddenFailure(e.message, errorCode: e.errorCode));
       } on ValidationException catch (e) {
         debugPrint('❌ [AuthRepository] ValidationException: ${e.errors}');
         return Left(ValidationFailure(e.errors));

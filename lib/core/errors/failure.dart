@@ -23,6 +23,13 @@ class UnauthorizedFailure extends Failure {
   const UnauthorizedFailure(super.message);
 }
 
+/// Failure pour les erreurs 403 (compte non approuvé, suspendu, etc.)
+class ForbiddenFailure extends Failure {
+  final String? errorCode;
+  
+  const ForbiddenFailure(super.message, {this.errorCode});
+}
+
 class ValidationFailure extends Failure {
   final Map<String, List<String>> errors;
 

@@ -91,6 +91,30 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
     }
   }
 
+  /// Convertit les messages d'erreur techniques en messages lisibles pour l'utilisateur
+  String _getReadableErrorMessage(String error) {
+    final errorLower = error.toLowerCase();
+    if (errorLower.contains('invalid credentials') || errorLower.contains('identifiants')) {
+      return 'Email ou mot de passe incorrect.\n\nVérifiez vos identifiants et réessayez.';
+    }
+    if (errorLower.contains('not approved') || errorLower.contains('non approuvé')) {
+      return 'Votre compte n\'a pas encore été approuvé par l\'administrateur.\n\nVeuillez patienter ou contacter le support.';
+    }
+    if (errorLower.contains('network') || errorLower.contains('connexion')) {
+      return 'Problème de connexion internet.\n\nVérifiez votre connexion et réessayez.';
+    }
+    if (errorLower.contains('email') && errorLower.contains('not found')) {
+      return 'Aucun compte n\'existe avec cet email.\n\nVérifiez l\'adresse ou créez un compte.';
+    }
+    if (errorLower.contains('disabled') || errorLower.contains('désactivé')) {
+      return 'Ce compte a été désactivé.\n\nContactez le support pour plus d\'informations.';
+    }
+    if (errorLower.contains('unauthorized') || errorLower.contains('401')) {
+      return 'Session expirée ou identifiants invalides.\n\nVeuillez réessayer.';
+    }
+    return error;
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen(authProvider, (previous, next) {
@@ -100,17 +124,138 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
         if (_isRedirecting && mounted) {
           setState(() => _isRedirecting = false);
         }
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
+        
+        // Déterminer le type d'erreur pour afficher un dialogue approprié
+        final errorMessage = next.errorMessage!;
+        final isAccountPending = errorMessage.contains('attente') || 
+                                  errorMessage.contains('pending') ||
+                                  errorMessage.contains('PENDING');
+        final isAccountSuspended = errorMessage.contains('suspendu') || 
+                                    errorMessage.contains('suspended');
+        final isAccountRejected = errorMessage.contains('refusé') || 
+                                   errorMessage.contains('rejected');
+        final isInvalidCredentials = errorMessage.contains('identifiants') || 
+                                      errorMessage.contains('incorrect') ||
+                                      errorMessage.contains('credentials');
+        
+        // Choisir l'icône et la couleur selon le type d'erreur
+        IconData icon;
+        Color iconColor;
+        String title;
+        
+        if (isAccountPending) {
+          icon = Icons.hourglass_top_rounded;
+          iconColor = Colors.orange;
+          title = 'Compte en attente';
+        } else if (isAccountSuspended) {
+          icon = Icons.block_rounded;
+          iconColor = Colors.red;
+          title = 'Compte suspendu';
+        } else if (isAccountRejected) {
+          icon = Icons.cancel_rounded;
+          iconColor = Colors.red;
+          title = 'Inscription refusée';
+        } else if (isInvalidCredentials) {
+          icon = Icons.password_rounded;
+          iconColor = Colors.orange;
+          title = 'Identifiants incorrects';
+        } else {
+          icon = Icons.error_outline;
+          iconColor = Colors.red;
+          title = 'Échec de connexion';
+        }
+        
+        // Afficher un dialogue d'erreur approprié
+        showDialog(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(icon, color: iconColor, size: 28),
+                const SizedBox(width: 12),
+                Expanded(child: Text(title)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getReadableErrorMessage(errorMessage),
+                  style: const TextStyle(fontSize: 16, height: 1.4),
+                ),
+                if (isAccountPending) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Vous recevrez un email dès que votre compte sera approuvé.',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              if (isAccountSuspended || isAccountRejected)
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    // TODO: Ouvrir l'écran de contact support
+                  },
+                  child: const Text('Contacter le support'),
+                ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                style: FilledButton.styleFrom(backgroundColor: Colors.teal),
+                child: const Text('Compris'),
+              ),
+            ],
+          ),
+        );
       }
       if (next.status == AuthStatus.authenticated && !_isRedirecting) {
-        debugPrint('✅ [LoginPage] Authentifié - redirection vers dashboard');
+        debugPrint('✅ [LoginPage] Authentifié - affichage message de bienvenue');
         if (mounted) {
           setState(() => _isRedirecting = true);
         }
-        // Small delay to ensure UI shows loading state before navigation
-        Future.delayed(const Duration(milliseconds: 50), () {
+        // Afficher un message de bienvenue avant la redirection
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Bienvenue ${next.user?.name ?? ''} !',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green[600],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        // Délai pour que l'utilisateur voie le message de bienvenue
+        Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) {
             context.go('/dashboard');
           }
@@ -257,13 +402,27 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
                               ),
                             ),
                             child: isLoading
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
+                                ? Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text(
+                                        'Connexion en cours...',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ],
                                   )
                                 : const Text(
                                     'Se connecter',

@@ -175,9 +175,31 @@ class ApiClient {
       final data = error.response!.data;
 
       if (statusCode == 401) {
-        return UnauthorizedException(
-          message: data is Map ? (data['message'] ?? 'Session expirée. Veuillez vous reconnecter.') : 'Session expirée',
-        );
+        // Identifiants invalides ou session expirée
+        String message = 'Session expirée. Veuillez vous reconnecter.';
+        if (data is Map) {
+          message = data['message'] ?? message;
+          // Ajouter les détails si disponibles
+          if (data['details'] != null) {
+            message = '$message\n${data['details']}';
+          }
+        }
+        return UnauthorizedException(message: message);
+      }
+      
+      if (statusCode == 403) {
+        // Compte non approuvé, suspendu ou rejeté
+        String message = 'Accès refusé';
+        String? errorCode;
+        if (data is Map) {
+          message = data['message'] ?? message;
+          errorCode = data['error_code'];
+          // Ajouter les détails si disponibles
+          if (data['details'] != null) {
+            message = '$message\n\n${data['details']}';
+          }
+        }
+        return ForbiddenException(message: message, errorCode: errorCode);
       }
       
       if (statusCode == 404) {

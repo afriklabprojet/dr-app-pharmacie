@@ -52,6 +52,48 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     }
   }
 
+  /// Convertit les messages d'erreur techniques en messages lisibles pour l'utilisateur
+  String _getReadableErrorMessage(String error) {
+    final errorLower = error.toLowerCase();
+    
+    // Email déjà utilisé
+    if (errorLower.contains('email') && (errorLower.contains('taken') || errorLower.contains('already') || errorLower.contains('existe'))) {
+      return 'Cette adresse email est déjà utilisée.\n\nUtilisez une autre adresse ou connectez-vous avec votre compte existant.';
+    }
+    
+    // Numéro de téléphone déjà utilisé
+    if (errorLower.contains('phone') && (errorLower.contains('taken') || errorLower.contains('already') || errorLower.contains('existe'))) {
+      return 'Ce numéro de téléphone est déjà associé à un compte.\n\nUtilisez un autre numéro ou contactez le support.';
+    }
+    
+    // Numéro de licence déjà utilisé
+    if (errorLower.contains('license') && (errorLower.contains('taken') || errorLower.contains('already') || errorLower.contains('existe'))) {
+      return 'Ce numéro de licence est déjà enregistré.\n\nVérifiez le numéro ou contactez le support.';
+    }
+    
+    // Mot de passe trop court
+    if (errorLower.contains('password') && (errorLower.contains('short') || errorLower.contains('minimum') || errorLower.contains('caractères'))) {
+      return 'Le mot de passe est trop court.\n\nIl doit contenir au moins 8 caractères.';
+    }
+    
+    // Email invalide
+    if (errorLower.contains('email') && errorLower.contains('invalid')) {
+      return 'L\'adresse email n\'est pas valide.\n\nVérifiez le format de l\'email.';
+    }
+    
+    // Erreur réseau
+    if (errorLower.contains('network') || errorLower.contains('connexion') || errorLower.contains('internet')) {
+      return 'Problème de connexion internet.\n\nVérifiez votre connexion et réessayez.';
+    }
+    
+    // Erreur serveur
+    if (errorLower.contains('server') || errorLower.contains('500')) {
+      return 'Le serveur est temporairement indisponible.\n\nVeuillez réessayer dans quelques instants.';
+    }
+    
+    return error;
+  }
+
   void _showSuccessDialog(BuildContext context) {
     // S'assurer qu'aucun dialogue n'est ouvert
     if (Navigator.of(context).canPop()) {
@@ -170,20 +212,21 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           context: context,
           barrierDismissible: true,
           builder: (dialogContext) => AlertDialog(
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.error_outline, color: Colors.red),
-                SizedBox(width: 8),
-                Text('Erreur'),
+                Icon(Icons.error_outline, color: Colors.red[600], size: 28),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('Échec de l\'inscription')),
               ],
             ),
             content: Text(
-              next.errorMessage ?? "Une erreur inconnue est survenue",
-              style: const TextStyle(fontSize: 16),
+              _getReadableErrorMessage(next.errorMessage!),
+              style: const TextStyle(fontSize: 16, height: 1.4),
             ),
             actions: [
-              TextButton(
+              FilledButton(
                 onPressed: () => Navigator.of(dialogContext).pop(),
+                style: FilledButton.styleFrom(backgroundColor: Colors.teal),
                 child: const Text('Compris'),
               ),
             ],
@@ -414,13 +457,27 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                               ),
                             ),
                             child: isLoading
-                                ? const SizedBox(
-                                    height: 24,
-                                    width: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
+                                ? Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text(
+                                        'Inscription en cours...',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ],
                                   )
                                 : const Text(
                                     "S'inscrire",
