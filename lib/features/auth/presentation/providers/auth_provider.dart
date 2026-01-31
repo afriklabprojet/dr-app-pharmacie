@@ -6,23 +6,37 @@ import 'state/auth_state.dart';
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
+  bool _isInitialized = false;
 
   AuthNotifier(this._repository) : super(const AuthState()) {
-    checkAuthStatus();
+    // Ne pas appeler checkAuthStatus ici pour éviter le loading initial
+    // L'initialisation sera faite manuellement quand nécessaire
+  }
+
+  /// Initialise le provider en vérifiant l'état d'authentification
+  /// Doit être appelé une seule fois au démarrage de l'app
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+    _isInitialized = true;
+    await checkAuthStatus();
   }
 
   Future<void> checkAuthStatus() async {
     debugPrint('🔍 [AuthNotifier] checkAuthStatus() appelé');
+    
+    // Ne pas mettre en loading pour éviter l'effet de loader inattendu
+    // state = state.copyWith(status: AuthStatus.loading);
+    
     final result = await _repository.getCurrentUser();
 
     result.fold(
       (failure) {
         debugPrint('🔍 [AuthNotifier] checkAuthStatus - Pas d\'utilisateur connecté: ${failure.message}');
-        state = state.copyWith(status: AuthStatus.unauthenticated);
+        state = state.copyWith(status: AuthStatus.unauthenticated, errorMessage: null);
       },
       (user) {
         debugPrint('🔍 [AuthNotifier] checkAuthStatus - Utilisateur trouvé: ${user.email}');
-        state = state.copyWith(status: AuthStatus.authenticated, user: user);
+        state = state.copyWith(status: AuthStatus.authenticated, user: user, errorMessage: null);
       },
     );
   }
@@ -98,6 +112,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: authResponse.user,
       ),
     );
+  }
+
+  /// Réinitialise l'état pour revenir à l'écran de login sans loader
+  /// Doit être appelé après une inscription réussie ou quand on navigue vers login
+  void resetToUnauthenticated() {
+    debugPrint('🔄 [AuthNotifier] resetToUnauthenticated() appelé');
+    state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  /// Efface uniquement le message d'erreur
+  void clearError() {
+    if (state.errorMessage != null) {
+      state = state.copyWith(errorMessage: null);
+    }
   }
 
   Future<void> logout() async {

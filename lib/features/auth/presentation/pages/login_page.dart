@@ -75,6 +75,25 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
     final authState = ref.read(authProvider);
     if (authState.status == AuthStatus.loading || _isRedirecting) {
       debugPrint('⚠️ [LoginPage] Submission ignorée - déjà en cours');
+      // Afficher un message si l'utilisateur clique plusieurs fois
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              SizedBox(
+                height: 16,
+                width: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Text('Connexion en cours, veuillez patienter...'),
+            ],
+          ),
+          backgroundColor: Colors.orange[700],
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
       return;
     }
     
@@ -88,30 +107,94 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
           .login(_emailController.text.trim(), _passwordController.text);
     } else {
       debugPrint('❌ [LoginPage] Validation du formulaire échouée');
+      // Afficher un message pour les erreurs de validation
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white),
+              SizedBox(width: 12),
+              Text('Veuillez corriger les erreurs du formulaire'),
+            ],
+          ),
+          backgroundColor: Colors.orange[700],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
   /// Convertit les messages d'erreur techniques en messages lisibles pour l'utilisateur
   String _getReadableErrorMessage(String error) {
     final errorLower = error.toLowerCase();
-    if (errorLower.contains('invalid credentials') || errorLower.contains('identifiants')) {
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Erreurs 401 - Identifiants invalides
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (errorLower.contains('invalid_credentials') || 
+        errorLower.contains('identifiants') ||
+        errorLower.contains('incorrect')) {
       return 'Email ou mot de passe incorrect.\n\nVérifiez vos identifiants et réessayez.';
     }
-    if (errorLower.contains('not approved') || errorLower.contains('non approuvé')) {
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Erreurs 403 - Compte pharmacie non approuvé/suspendu/rejeté
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (errorLower.contains('pharmacy_pending_approval') || 
+        errorLower.contains('en attente d\'approbation') ||
+        errorLower.contains('attente de validation')) {
+      return 'Votre pharmacie est en attente d\'approbation.\n\nL\'administrateur examine votre dossier. Vous serez notifié par email une fois approuvé.\n\nDélai habituel : 24-48h.';
+    }
+    
+    if (errorLower.contains('pharmacy_suspended') || 
+        errorLower.contains('pharmacie a été suspendue')) {
+      return 'Votre pharmacie a été suspendue.\n\nVeuillez contacter le support pour connaître les raisons et les démarches à suivre.';
+    }
+    
+    if (errorLower.contains('pharmacy_rejected') || 
+        errorLower.contains('demande d\'inscription a été refusée')) {
+      return 'Votre demande d\'inscription a été refusée.\n\nVeuillez contacter le support pour connaître les raisons du refus et les recours possibles.';
+    }
+    
+    // Compte en attente générique
+    if (errorLower.contains('pending') || 
+        errorLower.contains('not approved') || 
+        errorLower.contains('non approuvé')) {
       return 'Votre compte n\'a pas encore été approuvé par l\'administrateur.\n\nVeuillez patienter ou contacter le support.';
     }
-    if (errorLower.contains('network') || errorLower.contains('connexion')) {
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Erreurs réseau
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (errorLower.contains('network') || 
+        errorLower.contains('connexion') ||
+        errorLower.contains('internet') ||
+        errorLower.contains('timeout')) {
       return 'Problème de connexion internet.\n\nVérifiez votre connexion et réessayez.';
     }
+    
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Autres erreurs d'authentification
+    // ═══════════════════════════════════════════════════════════════════════════
     if (errorLower.contains('email') && errorLower.contains('not found')) {
       return 'Aucun compte n\'existe avec cet email.\n\nVérifiez l\'adresse ou créez un compte.';
     }
+    
     if (errorLower.contains('disabled') || errorLower.contains('désactivé')) {
       return 'Ce compte a été désactivé.\n\nContactez le support pour plus d\'informations.';
     }
+    
     if (errorLower.contains('unauthorized') || errorLower.contains('401')) {
       return 'Session expirée ou identifiants invalides.\n\nVeuillez réessayer.';
     }
+    
+    if (errorLower.contains('compte') && errorLower.contains('pharmacie')) {
+      return 'Ce compte n\'est pas un compte pharmacie.\n\nVeuillez utiliser l\'application appropriée.';
+    }
+    
+    // Retourner le message tel quel s'il est déjà formaté correctement
     return error;
   }
 
@@ -127,16 +210,30 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
         
         // Déterminer le type d'erreur pour afficher un dialogue approprié
         final errorMessage = next.errorMessage!;
-        final isAccountPending = errorMessage.contains('attente') || 
-                                  errorMessage.contains('pending') ||
-                                  errorMessage.contains('PENDING');
-        final isAccountSuspended = errorMessage.contains('suspendu') || 
-                                    errorMessage.contains('suspended');
-        final isAccountRejected = errorMessage.contains('refusé') || 
-                                   errorMessage.contains('rejected');
-        final isInvalidCredentials = errorMessage.contains('identifiants') || 
-                                      errorMessage.contains('incorrect') ||
-                                      errorMessage.contains('credentials');
+        final errorLower = errorMessage.toLowerCase();
+        
+        // Détection précise des types d'erreur basée sur les codes backend
+        final isAccountPending = errorLower.contains('attente') || 
+                                  errorLower.contains('pending') ||
+                                  errorLower.contains('pharmacy_pending_approval') ||
+                                  errorLower.contains('en cours d\'examen');
+        final isAccountSuspended = errorLower.contains('suspendu') || 
+                                    errorLower.contains('suspended') ||
+                                    errorLower.contains('pharmacy_suspended');
+        final isAccountRejected = errorLower.contains('refusé') || 
+                                   errorLower.contains('rejected') ||
+                                   errorLower.contains('pharmacy_rejected');
+        final isInvalidCredentials = errorLower.contains('identifiants') || 
+                                      errorLower.contains('incorrect') ||
+                                      errorLower.contains('credentials') ||
+                                      errorLower.contains('invalid_credentials') ||
+                                      errorLower.contains('mot de passe');
+        final isNetworkError = errorLower.contains('connexion') ||
+                                errorLower.contains('network') ||
+                                errorLower.contains('internet') ||
+                                errorLower.contains('timeout');
+        final isWrongApp = errorLower.contains('n\'est pas un compte pharmacie') ||
+                            errorLower.contains('application appropriée');
         
         // Choisir l'icône et la couleur selon le type d'erreur
         IconData icon;
@@ -146,11 +243,11 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
         if (isAccountPending) {
           icon = Icons.hourglass_top_rounded;
           iconColor = Colors.orange;
-          title = 'Compte en attente';
+          title = 'Pharmacie en attente d\'approbation';
         } else if (isAccountSuspended) {
           icon = Icons.block_rounded;
           iconColor = Colors.red;
-          title = 'Compte suspendu';
+          title = 'Pharmacie suspendue';
         } else if (isAccountRejected) {
           icon = Icons.cancel_rounded;
           iconColor = Colors.red;
@@ -159,6 +256,14 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
           icon = Icons.password_rounded;
           iconColor = Colors.orange;
           title = 'Identifiants incorrects';
+        } else if (isNetworkError) {
+          icon = Icons.wifi_off_rounded;
+          iconColor = Colors.grey;
+          title = 'Problème de connexion';
+        } else if (isWrongApp) {
+          icon = Icons.app_blocking_rounded;
+          iconColor = Colors.blue;
+          title = 'Mauvaise application';
         } else {
           icon = Icons.error_outline;
           iconColor = Colors.red;

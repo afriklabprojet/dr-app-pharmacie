@@ -38,6 +38,31 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   void _submit() {
+    final authState = ref.read(authProvider);
+    
+    // Empêcher les soumissions multiples
+    if (authState.status == AuthStatus.loading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              SizedBox(
+                height: 16,
+                width: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Text('Inscription en cours, veuillez patienter...'),
+            ],
+          ),
+          backgroundColor: Colors.orange[700],
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
     if (_formKey.currentState!.validate()) {
       ref.read(authProvider.notifier).register(
             name: _nameController.text.trim(),
@@ -49,6 +74,23 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             address: _addressController.text.trim(),
             password: _passwordController.text,
           );
+    } else {
+      // Afficher un message pour les erreurs de validation
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(child: Text('Veuillez corriger les erreurs du formulaire')),
+            ],
+          ),
+          backgroundColor: Colors.orange[700],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -175,6 +217,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   height: 50,
                   child: FilledButton(
                     onPressed: () {
+                      // Réinitialiser l'état d'auth AVANT la navigation
+                      ref.read(authProvider.notifier).resetToUnauthenticated();
                       Navigator.of(dialogContext).pop();
                       context.go('/login');
                     },
