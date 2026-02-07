@@ -181,32 +181,59 @@ class _LoginPageState extends ConsumerState<LoginPage>
 
   /// Gère l'affichage du dialogue d'erreur.
   /// 
-  /// ✅ PRODUCTION: addPostFrameCallback garantit que le build est terminé
+  /// ✅ PRODUCTION: Future.microtask pour l'asynchronicité
   /// ✅ PRODUCTION: try-catch avec fallback SnackBar
   /// ✅ PRODUCTION: Double vérification mounted
   void _handleErrorState(AuthState state) {
     final errorMessage = state.errorMessage;
-    if (errorMessage == null || !mounted) return;
+    debugPrint('🚨 [_handleErrorState] APPELÉ - errorMessage: $errorMessage, mounted: $mounted');
     
-    // Attendre la fin du frame pour éviter les conflits de build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+    if (errorMessage == null) {
+      debugPrint('🚨 [_handleErrorState] ABANDON: errorMessage null');
+      return;
+    }
+    if (!mounted) {
+      debugPrint('🚨 [_handleErrorState] ABANDON: not mounted');
+      return;
+    }
+    
+    // ✅ FIX: Utiliser Future.microtask au lieu de addPostFrameCallback
+    // microtask s'exécute après le build actuel mais avant le prochain frame
+    Future.microtask(() {
+      debugPrint('🚨 [_handleErrorState] Future.microtask EXÉCUTÉ - mounted: $mounted');
+      
+      if (!mounted) {
+        debugPrint('🚨 [_handleErrorState] ABANDON dans microtask: not mounted');
+        return;
+      }
+      
+      debugPrint('🚨 [_handleErrorState] Appel ErrorHandler.showErrorDialog()...');
       
       try {
         ErrorHandler.showErrorDialog(
           context,
           errorMessage,
           onDismiss: () {
+            debugPrint('🚨 [_handleErrorState] Dialog FERMÉ, appel clearError()');
             if (mounted) {
               ref.read(authProvider.notifier).clearError();
             }
           },
         );
-      } catch (e) {
+        debugPrint('🚨 [_handleErrorState] showErrorDialog() APPELÉ AVEC SUCCÈS');
+      } catch (e, stackTrace) {
         // Fallback: SnackBar si le dialog échoue
-        debugPrint('⚠️ [Auth] Dialog error, using SnackBar: $e');
+        debugPrint('💥 [_handleErrorState] EXCEPTION: $e');
+        debugPrint('💥 [_handleErrorState] StackTrace: $stackTrace');
         if (mounted) {
-          ErrorHandler.showErrorSnackBar(context, errorMessage);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
           ref.read(authProvider.notifier).clearError();
         }
       }

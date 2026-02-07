@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import '../errors/exceptions.dart';
+import '../utils/error_mapper.dart';
 
 class ApiClient {
   late final Dio _dio;
@@ -176,13 +177,14 @@ class ApiClient {
 
       if (statusCode == 401) {
         // Identifiants invalides ou session expirée
+        String? errorCode;
         String message = 'Session expirée. Veuillez vous reconnecter.';
+        
         if (data is Map) {
-          message = data['message'] ?? message;
-          // Ajouter les détails si disponibles
-          if (data['details'] != null) {
-            message = '$message\n${data['details']}';
-          }
+          errorCode = data['error_code']?.toString();
+          final serverMessage = data['message']?.toString();
+          // Utiliser ErrorMapper pour un message UX propre
+          message = ErrorMapper.format(errorCode, serverMessage);
         }
         return UnauthorizedException(message: message);
       }
