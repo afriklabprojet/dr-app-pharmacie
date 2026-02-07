@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/presentation/widgets/error_display.dart';
+import '../../../../core/utils/error_messages.dart';
 import '../providers/auth_provider.dart';
 import '../providers/state/auth_state.dart';
 
@@ -42,23 +44,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     
     // Empêcher les soumissions multiples
     if (authState.status == AuthStatus.loading) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              SizedBox(
-                height: 16,
-                width: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              ),
-              SizedBox(width: 12),
-              Text('Inscription en cours, veuillez patienter...'),
-            ],
-          ),
-          backgroundColor: Colors.orange[700],
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
+      ErrorSnackBar.showWarning(
+        context,
+        'Inscription en cours, veuillez patienter...',
       );
       return;
     }
@@ -76,20 +64,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           );
     } else {
       // Afficher un message pour les erreurs de validation
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(child: Text('Veuillez corriger les erreurs du formulaire')),
-            ],
-          ),
-          backgroundColor: Colors.orange[700],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          duration: const Duration(seconds: 3),
-        ),
+      ErrorSnackBar.showWarning(
+        context,
+        'Veuillez corriger les erreurs du formulaire',
       );
     }
   }

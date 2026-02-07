@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/presentation/widgets/connectivity_widgets.dart';
 import '../../../../core/providers/core_providers.dart';
+import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../orders/presentation/pages/orders_list_page.dart';
 import '../../../prescriptions/presentation/pages/prescriptions_list_page.dart';
 import '../../../inventory/presentation/pages/inventory_page.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
 import '../../../wallet/presentation/screens/wallet_screen.dart';
+import '../widgets/home_dashboard_widget.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -20,15 +22,19 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   int _currentIndex = 0;
 
   final List<Widget> _pages = [
-    const OrdersListPage(), // Index 0
-    const PrescriptionsListPage(), // Index 1
-    const InventoryPage(), // Index 2
-    const WalletScreen(), // Index 3
-    const ProfilePage(), // Index 4
+    const HomeDashboardWidget(), // Index 0 - Nouveau tableau de bord
+    const OrdersListPage(), // Index 1
+    const PrescriptionsListPage(), // Index 2
+    const InventoryPage(), // Index 3
+    const WalletScreen(), // Index 4
+    const ProfilePage(), // Index 5
   ];
 
   @override
   Widget build(BuildContext context) {
+    // Récupérer le nombre de notifications non lues
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
+    
     return ConnectivityBanner(
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -36,12 +42,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           index: _currentIndex, 
           children: _pages,
         ),
-        bottomNavigationBar: _buildBottomNav(),
+        bottomNavigationBar: _buildBottomNav(unreadCount),
       ),
     );
   }
 
-  Widget _buildBottomNav() {
+  Widget _buildBottomNav(int unreadNotifications) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -55,44 +61,52 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _NavItem(
+                icon: Icons.home_outlined,
+                selectedIcon: Icons.home_rounded,
+                label: 'Accueil',
+                isSelected: _currentIndex == 0,
+                onTap: () => _selectTab(0),
+                badgeCount: unreadNotifications,
+              ),
+              _NavItem(
                 icon: Icons.shopping_bag_outlined,
                 selectedIcon: Icons.shopping_bag_rounded,
                 label: 'Commandes',
-                isSelected: _currentIndex == 0,
-                onTap: () => _selectTab(0),
+                isSelected: _currentIndex == 1,
+                onTap: () => _selectTab(1),
               ),
               _NavItem(
                 icon: Icons.medical_services_outlined,
                 selectedIcon: Icons.medical_services_rounded,
                 label: 'Ordos',
-                isSelected: _currentIndex == 1,
-                onTap: () => _selectTab(1),
+                isSelected: _currentIndex == 2,
+                onTap: () => _selectTab(2),
               ),
               _NavItem(
                 icon: Icons.inventory_2_outlined,
                 selectedIcon: Icons.inventory_2_rounded,
                 label: 'Stock',
-                isSelected: _currentIndex == 2,
-                onTap: () => _selectTab(2),
+                isSelected: _currentIndex == 3,
+                onTap: () => _selectTab(3),
               ),
               _NavItem(
                 icon: Icons.account_balance_wallet_outlined,
                 selectedIcon: Icons.account_balance_wallet_rounded,
                 label: 'Finances',
-                isSelected: _currentIndex == 3,
-                onTap: () => _selectTab(3),
+                isSelected: _currentIndex == 4,
+                onTap: () => _selectTab(4),
               ),
               _NavItem(
                 icon: Icons.person_outline,
                 selectedIcon: Icons.person_rounded,
                 label: 'Profil',
-                isSelected: _currentIndex == 4,
-                onTap: () => _selectTab(4),
+                isSelected: _currentIndex == 5,
+                onTap: () => _selectTab(5),
               ),
             ],
           ),

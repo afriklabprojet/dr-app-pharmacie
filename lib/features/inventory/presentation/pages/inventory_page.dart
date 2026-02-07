@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/presentation/widgets/voice_search_widget.dart';
+import '../../../../core/presentation/widgets/error_display.dart';
+import '../../../../core/utils/error_messages.dart';
 import '../../../notifications/presentation/providers/notifications_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/product_entity.dart';
@@ -56,7 +58,10 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur scanner: $e')));
+        ErrorSnackBar.showError(
+          context, 
+          ErrorMessages.getInventoryError(e.toString()),
+        );
       }
     }
   }
@@ -72,15 +77,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       _searchController.text = result;
       ref.read(inventoryProvider.notifier).search(result);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Recherche: "$result"'),
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      ErrorSnackBar.showInfo(context, 'Recherche: "$result"');
     }
   }
 

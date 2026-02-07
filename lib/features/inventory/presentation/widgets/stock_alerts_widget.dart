@@ -188,35 +188,41 @@ class _StockAlertsWidgetState extends ConsumerState<StockAlertsWidget> {
   Widget build(BuildContext context) {
     final filteredAlerts = _filteredAlerts;
     
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header
-        if (widget.showHeader) _buildHeader(),
-        
-        // Filter chips
-        _buildFilterChips(),
-        const SizedBox(height: 12),
-        
-        // Alert summary cards
-        _buildSummaryCards(),
-        const SizedBox(height: 16),
-        
-        // Alerts list
-        if (filteredAlerts.isEmpty)
-          _buildEmptyState()
-        else
-          ...filteredAlerts.map((alert) => _StockAlertCard(
-            alert: alert,
-            onTap: () => _markAsRead(alert.id),
-            onDismiss: () => _dismissAlert(alert.id),
-            onAction: () => _handleAlertAction(alert),
-          )),
-        
-        // View all button
-        if (widget.onViewAll != null && _alerts.length > widget.maxAlerts)
-          _buildViewAllButton(),
-      ],
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          if (widget.showHeader) _buildHeader(),
+          
+          // Filter chips
+          _buildFilterChips(),
+          const SizedBox(height: 12),
+          
+          // Alert summary cards
+          _buildSummaryCards(),
+          const SizedBox(height: 16),
+          
+          // Alerts list
+          if (filteredAlerts.isEmpty)
+            _buildEmptyState()
+          else
+            ...filteredAlerts.map((alert) => _StockAlertCard(
+              alert: alert,
+              onTap: () => _markAsRead(alert.id),
+              onDismiss: () => _dismissAlert(alert.id),
+              onAction: () => _handleAlertAction(alert),
+            )),
+          
+          // View all button
+          if (widget.onViewAll != null && _alerts.length > widget.maxAlerts)
+            _buildViewAllButton(),
+          
+          // Add bottom padding for safety
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 

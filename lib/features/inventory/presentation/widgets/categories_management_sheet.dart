@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/presentation/widgets/error_display.dart';
+import '../../../../core/utils/error_messages.dart';
 import '../providers/inventory_provider.dart';
 
 class CategoriesManagementSheet extends ConsumerStatefulWidget {
@@ -48,20 +50,13 @@ class _CategoriesManagementSheetState extends ConsumerState<CategoriesManagement
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Catégorie ajoutée avec succès"),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ErrorSnackBar.showSuccess(context, "Catégorie ajoutée avec succès !");
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Erreur: $e"),
-            backgroundColor: Colors.red,
-          ),
+        ErrorSnackBar.showError(
+          context,
+          ErrorMessages.getInventoryError(e.toString()),
         );
         setState(() => _isLoading = false);
       }

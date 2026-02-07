@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/presentation/widgets/error_display.dart';
+import '../../../../core/utils/error_messages.dart';
 import '../providers/reports_provider.dart';
 
 /// Helper pour parser les valeurs numériques de façon sécurisée
@@ -158,11 +160,11 @@ class _ReportsDashboardPageState extends ConsumerState<ReportsDashboardPage>
     if (overview != null && overview['sales'] != null) {
       final sales = overview['sales'];
       return {
-        'today': (sales['today'] ?? 0).toDouble(),
-        'yesterday': (sales['yesterday'] ?? 0).toDouble(),
-        'week': (sales['period_total'] ?? 0).toDouble(),
-        'month': (sales['period_total'] ?? 0).toDouble(),
-        'growth': (sales['growth'] ?? 0).toDouble(),
+        'today': _safeDouble(sales['today']),
+        'yesterday': _safeDouble(sales['yesterday']),
+        'week': _safeDouble(sales['period_total']),
+        'month': _safeDouble(sales['period_total']),
+        'growth': _safeDouble(sales['growth']),
       };
     }
     // Default values
@@ -180,10 +182,10 @@ class _ReportsDashboardPageState extends ConsumerState<ReportsDashboardPage>
     if (overview != null && overview['orders'] != null) {
       final orders = overview['orders'];
       return {
-        'total': orders['total'] ?? 0,
-        'pending': orders['pending'] ?? 0,
-        'completed': orders['completed'] ?? 0,
-        'cancelled': orders['cancelled'] ?? 0,
+        'total': _safeInt(orders['total']),
+        'pending': _safeInt(orders['pending']),
+        'completed': _safeInt(orders['completed']),
+        'cancelled': _safeInt(orders['cancelled']),
       };
     }
     return {
@@ -199,10 +201,10 @@ class _ReportsDashboardPageState extends ConsumerState<ReportsDashboardPage>
     if (overview != null && overview['inventory'] != null) {
       final inventory = overview['inventory'];
       return {
-        'totalProducts': inventory['total_products'] ?? 0,
-        'lowStock': inventory['low_stock'] ?? 0,
-        'expiringSoon': inventory['expiring_soon'] ?? 0,
-        'outOfStock': inventory['out_of_stock'] ?? 0,
+        'totalProducts': _safeInt(inventory['total_products']),
+        'lowStock': _safeInt(inventory['low_stock']),
+        'expiringSoon': _safeInt(inventory['expiring_soon']),
+        'outOfStock': _safeInt(inventory['out_of_stock']),
       };
     }
     return {
@@ -258,12 +260,7 @@ class _ReportsDashboardPageState extends ConsumerState<ReportsDashboardPage>
 
   void _doExport(String format) async {
     Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Export $format en cours...'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-      ),
-    );
+    ErrorSnackBar.showInfo(context, 'Export $format en cours...');
     
     // Call export API
     final result = await ref.read(reportsProvider.notifier).exportReport(
@@ -272,12 +269,7 @@ class _ReportsDashboardPageState extends ConsumerState<ReportsDashboardPage>
     );
     
     if (result != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Export généré avec succès'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      ErrorSnackBar.showSuccess(context, 'Export généré avec succès !');
     }
   }
 }

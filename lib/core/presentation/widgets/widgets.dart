@@ -8,3 +8,4 @@ export 'indicators.dart';
 export 'connectivity_widgets.dart';
 export 'enhanced_headers.dart';
 export 'voice_search_widget.dart';
+export 'error_display.dart';

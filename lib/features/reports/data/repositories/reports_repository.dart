@@ -1,6 +1,55 @@
 import 'package:dio/dio.dart';
 import '../../../../core/config/env_config.dart';
 
+/// Helper pour parser les valeurs numériques de façon sécurisée
+int _safeInt(dynamic value) {
+  if (value == null) return 0;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  if (value is num) return value.toInt();
+  return 0;
+}
+
+double _safeDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0.0;
+  if (value is num) return value.toDouble();
+  return 0.0;
+}
+
+/// Normalise les données de l'overview pour éviter les erreurs de type
+Map<String, dynamic> _normalizeOverviewData(Map<String, dynamic> data) {
+  final sales = data['sales'] as Map<String, dynamic>?;
+  final orders = data['orders'] as Map<String, dynamic>?;
+  final inventory = data['inventory'] as Map<String, dynamic>?;
+  
+  return {
+    'period': data['period']?.toString() ?? 'week',
+    'date_range': data['date_range'],
+    'sales': sales != null ? {
+      'today': _safeDouble(sales['today']),
+      'yesterday': _safeDouble(sales['yesterday']),
+      'period_total': _safeDouble(sales['period_total']),
+      'growth': _safeDouble(sales['growth']),
+    } : null,
+    'orders': orders != null ? {
+      'total': _safeInt(orders['total']),
+      'pending': _safeInt(orders['pending']),
+      'completed': _safeInt(orders['completed']),
+      'cancelled': _safeInt(orders['cancelled']),
+    } : null,
+    'inventory': inventory != null ? {
+      'total_products': _safeInt(inventory['total_products']),
+      'low_stock': _safeInt(inventory['low_stock']),
+      'out_of_stock': _safeInt(inventory['out_of_stock']),
+      'expiring_soon': _safeInt(inventory['expiring_soon']),
+    } : null,
+  };
+}
+
 /// Repository pour les rapports et analytics
 class ReportsRepository {
   final Dio _dio;
@@ -24,9 +73,10 @@ class ReportsRepository {
       );
       
       if (response.data['success'] == true) {
-        return response.data['data'];
+        final data = response.data['data'] as Map<String, dynamic>;
+        return _normalizeOverviewData(data);
       }
-      throw Exception(response.data['message'] ?? 'Erreur lors du chargement');
+      throw Exception(response.data['message']?.toString() ?? 'Erreur lors du chargement');
     } on DioException catch (e) {
       throw _handleError(e);
     }

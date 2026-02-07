@@ -9,6 +9,7 @@ import 'core/theme/theme_provider.dart';
 import 'core/config/routes.dart';
 import 'core/config/env_config.dart';
 import 'core/providers/core_providers.dart';
+import 'features/auth/presentation/providers/auth_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,17 +52,25 @@ class _PharmacyAppState extends ConsumerState<PharmacyApp> {
   @override
   void initState() {
     super.initState();
-    // Initialize notifications after frame build
+    // Initialize auth and notifications after frame build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initNotifications();
+      _initApp();
     });
   }
 
-  Future<void> _initNotifications() async {
+  Future<void> _initApp() async {
+    try {
+      // Initialiser l'authentification (restaurer la session si token présent)
+      await ref.read(authProvider.notifier).initialize();
+      debugPrint("✅ Auth initialized - checking saved session");
+    } catch (e) {
+      debugPrint("❌ Error initializing auth: $e");
+    }
+    
     try {
       await ref.read(notificationServiceProvider).initialize();
     } catch (e) {
-      debugPrint("Error initializing notifications: $e");
+      debugPrint("❌ Error initializing notifications: $e");
     }
   }
 

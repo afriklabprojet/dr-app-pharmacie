@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/presentation/widgets/ui_components.dart';
+import '../../../../core/presentation/widgets/error_display.dart';
+import '../../../../core/utils/error_messages.dart';
 import '../providers/inventory_provider.dart';
 import '../../domain/entities/product_entity.dart';
 
@@ -158,9 +160,7 @@ class _AddProductSheetState extends ConsumerState<AddProductSheet> {
          );
          if (mounted) {
             context.pop(); 
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: const Text("Produit modifié avec succès"), backgroundColor: Colors.green),
-            );
+            ErrorSnackBar.showSuccess(context, "Produit modifié avec succès !");
          }
       } else {
         // Create
@@ -176,15 +176,14 @@ class _AddProductSheetState extends ConsumerState<AddProductSheet> {
         );
         if (mounted) {
           context.pop(); 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text("Produit ajouté avec succès"), backgroundColor: Colors.green),
-          );
+          ErrorSnackBar.showSuccess(context, "Produit ajouté avec succès !");
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur: $e"), backgroundColor: Colors.red),
+        ErrorSnackBar.showError(
+          context, 
+          ErrorMessages.getInventoryError(e.toString()),
         );
       }
     } finally {

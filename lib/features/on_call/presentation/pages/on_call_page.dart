@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/presentation/widgets/error_display.dart';
+import '../../../../core/utils/error_messages.dart';
 import '../../data/models/on_call_model.dart';
 import '../providers/on_call_provider.dart';
 
@@ -84,9 +86,7 @@ class _OnCallPageState extends ConsumerState<OnCallPage> {
         );
         
         if (success && mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(content: Text('Mode garde activé avec succès')),
-           );
+           ErrorSnackBar.showSuccess(context, 'Mode garde activé avec succès !');
         }
       }
     } else {
@@ -115,9 +115,7 @@ class _OnCallPageState extends ConsumerState<OnCallPage> {
       if (confirm == true) {
         final success = await ref.read(onCallProvider.notifier).deleteOnCall(activeShift.id);
          if (success && mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             const SnackBar(content: Text('Mode garde désactivé')),
-           );
+           ErrorSnackBar.showInfo(context, 'Mode garde désactivé');
         }
       }
     }
@@ -859,8 +857,9 @@ class _AddOnCallSheetState extends ConsumerState<AddOnCallSheet> {
     );
 
     if (end.isBefore(start)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La date de fin doit être après la date de début')),
+      ErrorSnackBar.showWarning(
+        context,
+        'La date de fin doit être après la date de début',
       );
       return;
     }
@@ -871,14 +870,13 @@ class _AddOnCallSheetState extends ConsumerState<AddOnCallSheet> {
 
     if (success && mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Garde ajoutée avec succès')),
-      );
+      ErrorSnackBar.showSuccess(context, 'Garde ajoutée avec succès !');
     } else if (mounted) {
        final error = ref.read(onCallProvider).error;
-       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error ?? 'Erreur lors de l\'ajout')),
-      );
+       ErrorSnackBar.showError(
+         context,
+         ErrorMessages.getReadableMessage(error ?? 'Erreur lors de l\'ajout'),
+       );
     }
   }
 }

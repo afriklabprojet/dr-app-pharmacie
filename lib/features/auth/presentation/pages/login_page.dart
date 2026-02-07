@@ -1,9 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../providers/auth_provider.dart';
 import '../providers/state/auth_state.dart';
+import '../../../../core/presentation/widgets/error_display.dart';
+import '../../../../core/utils/error_messages.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -12,25 +14,25 @@ class LoginPage extends ConsumerStatefulWidget {
   ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProviderStateMixin {
+class _LoginPageState extends ConsumerState<LoginPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+  bool _obscurePassword = true;
+  bool _rememberMe = false;
+  bool _isRedirecting = false;
+
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  late Animation<Offset> _slideAnimation;
-
-  bool _isPasswordVisible = false;
-  bool _isRedirecting = false; // Prevent multiple redirections
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 800),
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -40,20 +42,10 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
       ),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-      ),
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2), 
-      end: Offset.zero
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.3, 1.0, curve: Curves.easeOut),
+        curve: const Interval(0.2, 0.8, curve: Curves.easeOutBack),
       ),
     );
 
@@ -68,298 +60,102 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
     super.dispose();
   }
 
-  void _submit() {
-    debugPrint('🔘 [LoginPage] _submit() appelé');
-    
-    // Prevent double-tap / multiple submissions
-    final authState = ref.read(authProvider);
-    if (authState.status == AuthStatus.loading || _isRedirecting) {
-      debugPrint('⚠️ [LoginPage] Submission ignorée - déjà en cours');
-      // Afficher un message si l'utilisateur clique plusieurs fois
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
+  void _showLoginError(String errorMessage) {
+    if (!mounted) return;
+
+    String title = 'Erreur de connexion';
+    IconData icon = Icons.error_outline;
+    Color iconColor = Colors.red;
+
+    if (errorMessage.contains('identifiants') ||
+        errorMessage.contains('incorrect') ||
+        errorMessage.contains('invalide')) {
+      title = 'Identifiants incorrects';
+      icon = Icons.lock_outline;
+      iconColor = Colors.orange;
+    } else if (errorMessage.contains('réseau') ||
+        errorMessage.contains('connexion') ||
+        errorMessage.contains('serveur')) {
+      title = 'Erreur de connexion';
+      icon = Icons.wifi_off;
+      iconColor = Colors.blue;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
             children: [
-              SizedBox(
-                height: 16,
-                width: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              Icon(icon, color: iconColor, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              SizedBox(width: 12),
-              Text('Connexion en cours, veuillez patienter...'),
             ],
           ),
-          backgroundColor: Colors.orange[700],
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-    
-    debugPrint('🔘 [LoginPage] Email: ${_emailController.text}');
-    debugPrint('🔘 [LoginPage] Form valid: ${_formKey.currentState?.validate()}');
-    
-    if (_formKey.currentState!.validate()) {
-      debugPrint('🔘 [LoginPage] Formulaire validé, appel de login...');
-      ref
-          .read(authProvider.notifier)
-          .login(_emailController.text.trim(), _passwordController.text);
-    } else {
-      debugPrint('❌ [LoginPage] Validation du formulaire échouée');
-      // Afficher un message pour les erreurs de validation
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.white),
-              SizedBox(width: 12),
-              Text('Veuillez corriger les erreurs du formulaire'),
-            ],
+          content: Text(
+            errorMessage,
+            style: const TextStyle(fontSize: 15),
           ),
-          backgroundColor: Colors.orange[700],
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'OK',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  /// Convertit les messages d'erreur techniques en messages lisibles pour l'utilisateur
-  String _getReadableErrorMessage(String error) {
-    final errorLower = error.toLowerCase();
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Erreurs 401 - Identifiants invalides
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (errorLower.contains('invalid_credentials') || 
-        errorLower.contains('identifiants') ||
-        errorLower.contains('incorrect')) {
-      return 'Email ou mot de passe incorrect.\n\nVérifiez vos identifiants et réessayez.';
+  void _handleLogin() {
+    if (_formKey.currentState!.validate()) {
+      ref.read(authProvider.notifier).login(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
     }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Erreurs 403 - Compte pharmacie non approuvé/suspendu/rejeté
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (errorLower.contains('pharmacy_pending_approval') || 
-        errorLower.contains('en attente d\'approbation') ||
-        errorLower.contains('attente de validation')) {
-      return 'Votre pharmacie est en attente d\'approbation.\n\nL\'administrateur examine votre dossier. Vous serez notifié par email une fois approuvé.\n\nDélai habituel : 24-48h.';
-    }
-    
-    if (errorLower.contains('pharmacy_suspended') || 
-        errorLower.contains('pharmacie a été suspendue')) {
-      return 'Votre pharmacie a été suspendue.\n\nVeuillez contacter le support pour connaître les raisons et les démarches à suivre.';
-    }
-    
-    if (errorLower.contains('pharmacy_rejected') || 
-        errorLower.contains('demande d\'inscription a été refusée')) {
-      return 'Votre demande d\'inscription a été refusée.\n\nVeuillez contacter le support pour connaître les raisons du refus et les recours possibles.';
-    }
-    
-    // Compte en attente générique
-    if (errorLower.contains('pending') || 
-        errorLower.contains('not approved') || 
-        errorLower.contains('non approuvé')) {
-      return 'Votre compte n\'a pas encore été approuvé par l\'administrateur.\n\nVeuillez patienter ou contacter le support.';
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Erreurs réseau
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (errorLower.contains('network') || 
-        errorLower.contains('connexion') ||
-        errorLower.contains('internet') ||
-        errorLower.contains('timeout')) {
-      return 'Problème de connexion internet.\n\nVérifiez votre connexion et réessayez.';
-    }
-    
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Autres erreurs d'authentification
-    // ═══════════════════════════════════════════════════════════════════════════
-    if (errorLower.contains('email') && errorLower.contains('not found')) {
-      return 'Aucun compte n\'existe avec cet email.\n\nVérifiez l\'adresse ou créez un compte.';
-    }
-    
-    if (errorLower.contains('disabled') || errorLower.contains('désactivé')) {
-      return 'Ce compte a été désactivé.\n\nContactez le support pour plus d\'informations.';
-    }
-    
-    if (errorLower.contains('unauthorized') || errorLower.contains('401')) {
-      return 'Session expirée ou identifiants invalides.\n\nVeuillez réessayer.';
-    }
-    
-    if (errorLower.contains('compte') && errorLower.contains('pharmacie')) {
-      return 'Ce compte n\'est pas un compte pharmacie.\n\nVeuillez utiliser l\'application appropriée.';
-    }
-    
-    // Retourner le message tel quel s'il est déjà formaté correctement
-    return error;
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(authProvider, (previous, next) {
-      debugPrint('👂 [LoginPage] Auth state changed: ${previous?.status} -> ${next.status}');
+    ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.status == AuthStatus.error && next.errorMessage != null) {
-        debugPrint('❌ [LoginPage] Erreur affichée: ${next.errorMessage}');
-        if (_isRedirecting && mounted) {
-          setState(() => _isRedirecting = false);
-        }
-        
-        // Déterminer le type d'erreur pour afficher un dialogue approprié
-        final errorMessage = next.errorMessage!;
-        final errorLower = errorMessage.toLowerCase();
-        
-        // Détection précise des types d'erreur basée sur les codes backend
-        final isAccountPending = errorLower.contains('attente') || 
-                                  errorLower.contains('pending') ||
-                                  errorLower.contains('pharmacy_pending_approval') ||
-                                  errorLower.contains('en cours d\'examen');
-        final isAccountSuspended = errorLower.contains('suspendu') || 
-                                    errorLower.contains('suspended') ||
-                                    errorLower.contains('pharmacy_suspended');
-        final isAccountRejected = errorLower.contains('refusé') || 
-                                   errorLower.contains('rejected') ||
-                                   errorLower.contains('pharmacy_rejected');
-        final isInvalidCredentials = errorLower.contains('identifiants') || 
-                                      errorLower.contains('incorrect') ||
-                                      errorLower.contains('credentials') ||
-                                      errorLower.contains('invalid_credentials') ||
-                                      errorLower.contains('mot de passe');
-        final isNetworkError = errorLower.contains('connexion') ||
-                                errorLower.contains('network') ||
-                                errorLower.contains('internet') ||
-                                errorLower.contains('timeout');
-        final isWrongApp = errorLower.contains('n\'est pas un compte pharmacie') ||
-                            errorLower.contains('application appropriée');
-        
-        // Choisir l'icône et la couleur selon le type d'erreur
-        IconData icon;
-        Color iconColor;
-        String title;
-        
-        if (isAccountPending) {
-          icon = Icons.hourglass_top_rounded;
-          iconColor = Colors.orange;
-          title = 'Pharmacie en attente d\'approbation';
-        } else if (isAccountSuspended) {
-          icon = Icons.block_rounded;
-          iconColor = Colors.red;
-          title = 'Pharmacie suspendue';
-        } else if (isAccountRejected) {
-          icon = Icons.cancel_rounded;
-          iconColor = Colors.red;
-          title = 'Inscription refusée';
-        } else if (isInvalidCredentials) {
-          icon = Icons.password_rounded;
-          iconColor = Colors.orange;
-          title = 'Identifiants incorrects';
-        } else if (isNetworkError) {
-          icon = Icons.wifi_off_rounded;
-          iconColor = Colors.grey;
-          title = 'Problème de connexion';
-        } else if (isWrongApp) {
-          icon = Icons.app_blocking_rounded;
-          iconColor = Colors.blue;
-          title = 'Mauvaise application';
-        } else {
-          icon = Icons.error_outline;
-          iconColor = Colors.red;
-          title = 'Échec de connexion';
-        }
-        
-        // Afficher un dialogue d'erreur approprié
-        showDialog(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: Row(
-              children: [
-                Icon(icon, color: iconColor, size: 28),
-                const SizedBox(width: 12),
-                Expanded(child: Text(title)),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _getReadableErrorMessage(errorMessage),
-                  style: const TextStyle(fontSize: 16, height: 1.4),
-                ),
-                if (isAccountPending) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'Vous recevrez un email dès que votre compte sera approuvé.',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              if (isAccountSuspended || isAccountRejected)
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                    // TODO: Ouvrir l'écran de contact support
-                  },
-                  child: const Text('Contacter le support'),
-                ),
-              FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                style: FilledButton.styleFrom(backgroundColor: Colors.teal),
-                child: const Text('Compris'),
-              ),
-            ],
-          ),
-        );
-      }
-      if (next.status == AuthStatus.authenticated && !_isRedirecting) {
-        debugPrint('✅ [LoginPage] Authentifié - affichage message de bienvenue');
-        if (mounted) {
-          setState(() => _isRedirecting = true);
-        }
-        // Afficher un message de bienvenue avant la redirection
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showLoginError(next.errorMessage!);
+        });
+      } else if (next.status == AuthStatus.authenticated && !_isRedirecting) {
+        setState(() => _isRedirecting = true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Bienvenue ${next.user?.name ?? ''} !',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                ),
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Connexion réussie !'),
               ],
             ),
             backgroundColor: Colors.green[600],
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 2),
           ),
         );
-        // Délai pour que l'utilisateur voie le message de bienvenue
         Future.delayed(const Duration(milliseconds: 800), () {
           if (mounted) {
             context.go('/dashboard');
@@ -368,207 +164,266 @@ class _LoginPageState extends ConsumerState<LoginPage> with SingleTickerProvider
       }
     });
 
-
     final authState = ref.watch(authProvider);
     final isLoading = authState.status == AuthStatus.loading || _isRedirecting;
-    
-    debugPrint('🖼️ [LoginPage] build() - status: ${authState.status}, isLoading: $isLoading');
 
     return Scaffold(
-      backgroundColor: Colors.teal[50],
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo section
-              Icon(
-                Icons.local_pharmacy_rounded,
-                size: 80,
-                color: Colors.teal[700],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'DR-PHARMA',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Colors.teal[900],
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF1B8F6F),
+              const Color(0xFF0D5C46),
+              Colors.teal.shade900,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: ScaleTransition(
+                      scale: _scaleAnimation,
+                      child: const Icon(
+                        Icons.local_pharmacy_rounded,
+                        size: 80,
+                        color: Colors.white,
+                      ),
                     ),
-              ),
-              Text(
-                'Espace Pharmacien',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.teal[600],
+                  ),
+                  const SizedBox(height: 16),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: const Text(
+                      'DR-PHARMA',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 2,
+                      ),
                     ),
-              ),
-              const SizedBox(height: 40),
-
-              // Form section
-              Card(
-                elevation: 4,
-                shadowColor: Colors.black26,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Connexion',
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 24),
-                        TextFormField(
-                          controller: _emailController,
-                          decoration: InputDecoration(
-                            labelText: 'Adresse Email',
-                            hintText: 'pharmacien@exemple.com',
-                            prefixIcon: const Icon(Icons.email_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  BorderSide(color: Colors.teal, width: 2),
-                            ),
+                  ),
+                  const SizedBox(height: 8),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Text(
+                      'Espace Pharmacie',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 400),
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
                           ),
-                          keyboardType: TextInputType.emailAddress,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer votre email';
-                            }
-                            // Basic email validation regex can be added here
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          decoration: InputDecoration(
-                            labelText: 'Mot de passe',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: Colors.grey.shade300),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  BorderSide(color: Colors.teal, width: 2),
-                            ),
-                          ),
-                          obscureText: true,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Veuillez entrer votre mot de passe';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: () => context.push('/forgot-password'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.teal[700],
-                            ),
-                            child: const Text('Mot de passe oublié ?'),
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          height: 50,
-                          child: FilledButton(
-                            onPressed: isLoading ? null : _submit,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.teal,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                        ],
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Connexion',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1B8F6F),
                               ),
+                              textAlign: TextAlign.center,
                             ),
-                            child: isLoading
-                                ? Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      SizedBox(
-                                        height: 20,
-                                        width: 20,
+                            const SizedBox(height: 24),
+                            TextFormField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: InputDecoration(
+                                labelText: 'Email',
+                                prefixIcon: const Icon(Icons.email_outlined),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey.shade300),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF1B8F6F),
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Veuillez entrer votre email';
+                                }
+                                if (!value.contains('@')) {
+                                  return 'Veuillez entrer un email valide';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
+                                labelText: 'Mot de passe',
+                                prefixIcon: const Icon(Icons.lock_outlined),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(color: Colors.grey.shade300),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF1B8F6F),
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Veuillez entrer votre mot de passe';
+                                }
+                                if (value.length < 6) {
+                                  return 'Le mot de passe doit contenir au moins 6 caractères';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? false;
+                                    });
+                                  },
+                                  activeColor: const Color(0xFF1B8F6F),
+                                ),
+                                const Text('Se souvenir de moi'),
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: () {},
+                                  child: const Text(
+                                    'Mot de passe oublié ?',
+                                    style: TextStyle(color: Color(0xFF1B8F6F)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: isLoading ? null : _handleLogin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1B8F6F),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 2,
+                                ),
+                                child: isLoading
+                                    ? const SizedBox(
+                                        height: 24,
+                                        width: 24,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          color: Colors.white,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                         ),
-                                      ),
-                                      SizedBox(width: 12),
-                                      Text(
-                                        'Connexion en cours...',
+                                      )
+                                    : const Text(
+                                        'Se connecter',
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.white70,
                                         ),
                                       ),
-                                    ],
-                                  )
-                                : const Text(
-                                    'Se connecter',
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text("Vous n'avez pas de compte ?"),
+                                TextButton(
+                                  onPressed: () {
+                                    context.go('/register');
+                                  },
+                                  child: const Text(
+                                    "S'inscrire",
                                     style: TextStyle(
-                                      fontSize: 16,
+                                      color: Color(0xFF1B8F6F),
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                          ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    "Vous n'avez pas de compte ?",
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                  TextButton(
-                    onPressed:
-                        isLoading ? null : () => context.push('/register'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.teal,
-                      textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  const SizedBox(height: 32),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Text(
+                      '© 2024 DR-PHARMA. Tous droits réservés.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 12,
+                      ),
                     ),
-                    child: const Text('Créer un compte'),
                   ),
                 ],
               ),
-
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-
