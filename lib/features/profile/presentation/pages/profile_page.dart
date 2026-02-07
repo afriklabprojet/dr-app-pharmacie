@@ -6,7 +6,6 @@ import '../../../notifications/presentation/providers/notifications_provider.dar
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/domain/entities/user_entity.dart';
 import '../../../auth/domain/entities/pharmacy_entity.dart';
-import '../../../auth/presentation/pages/login_page.dart';
 import '../../../on_call/presentation/pages/on_call_page.dart';
 import 'edit_pharmacy_page.dart';
 import 'edit_profile_page.dart';
@@ -439,12 +438,7 @@ class ProfilePage extends ConsumerWidget {
          await ref.read(authProvider.notifier).logout();
          
          if (context.mounted) {
-           Navigator.of(context).pushAndRemoveUntil(
-             MaterialPageRoute(
-               builder: (context) => const LoginPage(),
-             ),
-             (route) => false,
-           );
+           context.go('/login');
          }
       }
     }

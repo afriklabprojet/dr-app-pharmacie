@@ -79,6 +79,24 @@ class _PharmacyAppState extends ConsumerState<PharmacyApp> {
     final router = ref.watch(routerProvider);
     final themeState = ref.watch(themeProvider);
     
+    // 🔐 Écouter les expirations de session (401 global)
+    ref.listen<bool>(sessionExpiredProvider, (previous, sessionExpired) {
+      if (sessionExpired) {
+        debugPrint('🔐 [Main] Session expired - redirecting to login');
+        // Logout et redirection
+        ref.read(authProvider.notifier).logout();
+        router.go('/login');
+        // Afficher un message à l'utilisateur
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Votre session a expiré. Veuillez vous reconnecter.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    });
+    
     // Obtenir la couleur d'accent dynamique
     Color? accentColor;
     if (themeState.customAccentColor != null) {

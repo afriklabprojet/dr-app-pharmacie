@@ -7,6 +7,9 @@ import '../services/cache_service.dart';
 import '../services/security_service.dart';
 import '../services/offline_storage_service.dart';
 
+// Re-export session manager pour accès facile
+export '../services/session_manager.dart';
+
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('SharedPreferences not initialized');
 });
