@@ -147,75 +147,70 @@ class _LoginPageState extends ConsumerState<LoginPage>
 
   /// Callback pour [ref.listen] - réagit aux changements d'état auth.
   /// 
-  /// ✅ SAFE: Appelé uniquement lors d'un CHANGEMENT d'état (pas à chaque rebuild)
-  /// ✅ SAFE: Vérifie previous pour éviter les doubles triggers
-  /// ✅ SAFE: Vérifie mounted avant toute interaction UI
+  /// ✅ PRODUCTION: Utilise addPostFrameCallback pour les side-effects UI
+  /// ✅ PRODUCTION: Vérifie mounted à chaque étape
+  /// ✅ PRODUCTION: Compare les status pour éviter les doublons
   void _onAuthStateChanged(AuthState? previous, AuthState next) {
-    debugPrint('🎯 [LoginPage] _onAuthStateChanged appelé');
-    debugPrint('🎯 [LoginPage] previous: ${previous?.status}, next: ${next.status}');
-    debugPrint('🎯 [LoginPage] errorMessage: ${next.errorMessage}');
+    // Log pour debug (retirer en production si trop verbeux)
+    debugPrint('🎯 [Auth] ${previous?.status} → ${next.status} | error: ${next.errorMessage}');
     
-    // Première émission (previous == null) → ignorer
-    if (previous == null) {
-      debugPrint('🎯 [LoginPage] previous == null, ignoré');
-      return;
-    }
+    // Ignorer la première émission (état initial)
+    if (previous == null) return;
     
-    // Pas de changement de status → ignorer
-    if (previous.status == next.status) {
-      debugPrint('🎯 [LoginPage] Même status, ignoré');
-      return;
-    }
+    // Ignorer si le status n'a pas changé
+    if (previous.status == next.status) return;
 
-    debugPrint('🎯 [LoginPage] Changement détecté: ${previous.status} → ${next.status}');
-
+    // Traiter selon le nouveau status
     switch (next.status) {
       case AuthStatus.error:
-        debugPrint('🎯 [LoginPage] → Appel _handleErrorState');
         _handleErrorState(next);
         break;
         
       case AuthStatus.authenticated:
-        debugPrint('🎯 [LoginPage] → Appel _handleAuthenticatedState');
         _handleAuthenticatedState(next);
         break;
         
-      default:
-        debugPrint('🎯 [LoginPage] → Status non géré: ${next.status}');
+      case AuthStatus.loading:
+      case AuthStatus.initial:
+      case AuthStatus.unauthenticated:
+      case AuthStatus.registered:
+        // Pas d'action UI requise
         break;
     }
   }
 
   /// Gère l'affichage du dialogue d'erreur.
+  /// 
+  /// ✅ PRODUCTION: addPostFrameCallback garantit que le build est terminé
+  /// ✅ PRODUCTION: try-catch avec fallback SnackBar
+  /// ✅ PRODUCTION: Double vérification mounted
   void _handleErrorState(AuthState state) {
-    debugPrint('🚨 [LoginPage] _handleErrorState appelé');
-    debugPrint('🚨 [LoginPage] errorMessage: ${state.errorMessage}');
-    debugPrint('🚨 [LoginPage] mounted: $mounted');
+    final errorMessage = state.errorMessage;
+    if (errorMessage == null || !mounted) return;
     
-    if (state.errorMessage == null) {
-      debugPrint('🚨 [LoginPage] errorMessage == null, abandon');
-      return;
-    }
-    if (!mounted) {
-      debugPrint('🚨 [LoginPage] !mounted, abandon');
-      return;
-    }
-    
-    debugPrint('🚨 [LoginPage] Appel ErrorHandler.showErrorDialog()...');
-    
-    // Utilisation du ErrorHandler centralisé
-    ErrorHandler.showErrorDialog(
-      context,
-      state.errorMessage!,
-      onDismiss: () {
-        debugPrint('🚨 [LoginPage] Dialog fermé, clearError()');
+    // Attendre la fin du frame pour éviter les conflits de build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      
+      try {
+        ErrorHandler.showErrorDialog(
+          context,
+          errorMessage,
+          onDismiss: () {
+            if (mounted) {
+              ref.read(authProvider.notifier).clearError();
+            }
+          },
+        );
+      } catch (e) {
+        // Fallback: SnackBar si le dialog échoue
+        debugPrint('⚠️ [Auth] Dialog error, using SnackBar: $e');
         if (mounted) {
+          ErrorHandler.showErrorSnackBar(context, errorMessage);
           ref.read(authProvider.notifier).clearError();
         }
-      },
-    );
-    
-    debugPrint('🚨 [LoginPage] showErrorDialog() appelé avec succès');
+      }
+    });
   }
 
   /// Gère la navigation après authentification réussie.

@@ -121,9 +121,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
-  /// Efface uniquement le message d'erreur
+  /// Efface le message d'erreur et remet le status à unauthenticated
+  /// ✅ IMPORTANT: Doit changer le status pour éviter les états incohérents
   void clearError() {
-    if (state.errorMessage != null) {
+    if (state.status == AuthStatus.error) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        errorMessage: null,
+      );
+    } else if (state.errorMessage != null) {
       state = state.copyWith(errorMessage: null);
     }
   }
